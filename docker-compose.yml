@@ -1,0 +1,43 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: deploy-portal-frontend
+    ports:
+      - "${PORT:-3000}:80"
+    environment:
+      - BACKEND_URL=${BACKEND_URL:-http://api:9000}
+    networks:
+      - deploy-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  frontend-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: deploy-portal-frontend-dev
+    profiles: ["dev"]
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    volumes:
+      - .:/app
+      - /app/node_modules
+    networks:
+      - deploy-network
+    restart: unless-stopped
+
+networks:
+  deploy-network:
+    name: ${DOCKER_NETWORK:-deploy-portal_default}
+    external: true

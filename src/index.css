@@ -1,0 +1,165 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --color-canvas: #EDF0EE;
+  --color-surface: #FFFFFF;
+  --color-surface-inset: #F4F6F5;
+  --color-sidebar: #17202A;
+  --color-sidebar-active: #24313E;
+  --color-sidebar-muted: #8F9CA7;
+  
+  --color-border: #CDD4D0;
+  --color-border-subdued: #E2E7E4;
+  
+  --color-text-primary: #17202A;
+  --color-text-secondary: #5E6B76;
+  --color-text-muted: #8F9CA7;
+  
+  --color-primary: #0F6E74;
+  --color-primary-hover: #0B5459;
+  --color-primary-active: #083F43;
+  
+  --color-status-success: #2E8B57;
+  --color-status-success-bg: #EAF5EE;
+  --color-status-success-border: #B8E0C5;
+
+  --color-status-running: #B87E0C;
+  --color-status-running-bg: #FAF3E7;
+  --color-status-running-border: #F1D6A4;
+
+  --color-status-failed: #C2412D;
+  --color-status-failed-bg: #FAEBE9;
+  --color-status-failed-border: #F1B5AC;
+}
+
+:root {
+  color-scheme: light;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background-color: #EDF0EE;
+  color: #17202A;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbars for high technical density */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #EDF0EE;
+}
+::-webkit-scrollbar-thumb {
+  background: #CDD4D0;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #B0B9B3;
+}
+
+/* Terminal custom scrollbar */
+.terminal-scroll::-webkit-scrollbar-track {
+  background: #11161B;
+}
+.terminal-scroll::-webkit-scrollbar-thumb {
+  background: #24313E;
+  border-radius: 3px;
+}
+.terminal-scroll::-webkit-scrollbar-thumb:hover {
+  background: #3A4B5C;
+}
+
+/* Typography Utility Classes */
+.text-display-lg {
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 40px;
+  letter-spacing: -0.02em;
+}
+
+.text-headline-lg {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 32px;
+  letter-spacing: -0.015em;
+}
+
+.text-headline-md {
+  font-family: var(--font-sans);
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  letter-spacing: -0.01em;
+}
+
+.text-headline-sm {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.text-body-lg {
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 22px;
+}
+
+.text-body-md {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.text-body-sm {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 16px;
+}
+
+.text-label-md {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.text-label-sm {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.font-code-md {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 18px;
+}
+
+.font-code-sm {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
