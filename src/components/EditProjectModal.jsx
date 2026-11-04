@@ -58,10 +58,11 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
     }
 
     let cleanRepoUrl = repoUrl.trim().replace(/^["']+|["']+$/g, '')
-    if (cleanRepoUrl.startsWith('github_pat_') || cleanRepoUrl.startsWith('ghp_')) {
-      if (!cleanRepoUrl.includes('@')) {
-        setFieldErrors({ repoUrl: 'This is only an access token. Use format: https://<token>@github.com/<owner>/<repo>.git' })
-        setError('You entered an access token without a repository URL.')
+    const strippedProtocol = cleanRepoUrl.replace(/^https?:\/\//i, '')
+    if (strippedProtocol.startsWith('github_pat_') || strippedProtocol.startsWith('ghp_') || strippedProtocol.startsWith('glpat-')) {
+      if (!cleanRepoUrl.includes('@github.com') && !cleanRepoUrl.includes('@gitlab.com') && !cleanRepoUrl.includes('@bitbucket.org')) {
+        setFieldErrors({ repoUrl: 'This is an access token without a repository path. Use: https://<token>@github.com/<owner>/<repo>.git' })
+        setError('You entered an access token without a repository URL. Format: https://<token>@github.com/<owner>/<repo>.git')
         return
       }
     }

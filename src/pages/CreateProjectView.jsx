@@ -131,6 +131,21 @@ export function CreateProjectView() {
       setSubmitError('Repository URL is required.')
       return
     }
+
+    let cleanRepoUrl = repoUrl.trim().replace(/^["']+|["']+$/g, '')
+    const strippedProtocol = cleanRepoUrl.replace(/^https?:\/\//i, '')
+    if (strippedProtocol.startsWith('github_pat_') || strippedProtocol.startsWith('ghp_') || strippedProtocol.startsWith('glpat-')) {
+      if (!cleanRepoUrl.includes('@github.com') && !cleanRepoUrl.includes('@gitlab.com') && !cleanRepoUrl.includes('@bitbucket.org')) {
+        setSubmitError('You entered an access token without a repository URL. Format: https://<token>@github.com/<owner>/<repo>.git')
+        return
+      }
+    }
+    if (!cleanRepoUrl.startsWith('http://') && !cleanRepoUrl.startsWith('https://') && !cleanRepoUrl.startsWith('git@') && !cleanRepoUrl.startsWith('ssh://')) {
+      if (cleanRepoUrl.includes('github.com') || cleanRepoUrl.includes('gitlab.com') || cleanRepoUrl.includes('bitbucket.org') || cleanRepoUrl.includes('@')) {
+        cleanRepoUrl = `https://${cleanRepoUrl}`
+      }
+    }
+
     setIsSubmitting(true)
     setSubmitError(null)
 
@@ -139,7 +154,7 @@ export function CreateProjectView() {
         method: 'POST',
         body: {
           name: projectName.trim(),
-          repoUrl: repoUrl.trim(),
+          repoUrl: cleanRepoUrl,
           defaultBranch: defaultBranch.trim() || 'main',
           autoDeploy: autoDeploy,
         },
