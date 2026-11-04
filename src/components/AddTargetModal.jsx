@@ -480,11 +480,11 @@ fi`
       '"C:\\Program Files\\nodejs\\node.exe" ${WIN_ENTRY} >> "${WIN_DIR}\\server.log" 2>&1',
       'START_CMD_EOF',
       '',
-      'cmd.exe /c "schtasks /query /tn \\"$TASK_NAME\\" >nul 2>&1 || schtasks /create /tn \\"$TASK_NAME\\" /tr \\"${WIN_DIR}\\start_service.cmd\\" /sc onstart /ru SYSTEM /f" 2>/dev/null || true',
+      'schtasks.exe //query //tn "$TASK_NAME" >/dev/null 2>&1 || schtasks.exe //create //tn "$TASK_NAME" //tr "${WIN_DIR}\\start_service.cmd" //sc onstart //ru SYSTEM //f >/dev/null 2>&1 || true',
       '',
       'echo "Restarting Node.js service on port $NODE_PORT..."',
-      'cmd.exe /c "powershell -Command \\"Stop-Process -Id (Get-NetTCPConnection -LocalPort $NODE_PORT).OwningProcess -Force -ErrorAction SilentlyContinue\\"" 2>/dev/null || true',
-      'cmd.exe /c "schtasks /run /tn \\"$TASK_NAME\\""',
+      'powershell.exe -NoProfile -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort $NODE_PORT -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue" 2>/dev/null || true',
+      'schtasks.exe //run //tn "$TASK_NAME" 2>/dev/null || schtasks.exe /run /tn "$TASK_NAME" 2>/dev/null || powershell.exe -NoProfile -Command "Start-Process cmd.exe -ArgumentList \'/c\', \'${WIN_DIR}\\start_service.cmd\' -WindowStyle Hidden" 2>/dev/null || true',
       '',
       'echo "Node.js API active and reverse-proxied via Apache on port $NODE_PORT."'
     ].join('\n')
