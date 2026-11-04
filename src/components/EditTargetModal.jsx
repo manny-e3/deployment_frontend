@@ -319,6 +319,11 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
                           Daemon
                         </span>
                       )}
+                      {preset.architecture.startsWith('windows') && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
+                          Windows
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[#565f6b] leading-tight mt-0.5">
                       {preset.desc}

@@ -11,6 +11,7 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
   const [framework, setFramework] = useState('react')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
+  const [fieldErrors, setFieldErrors] = useState({})
   const [success, setSuccess] = useState(false)
 
   useEffect(() => {
@@ -31,6 +32,7 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
       setFramework(storedFramework)
       setAutoDeploy(project.autoDeploy ?? false)
       setError(null)
+      setFieldErrors({})
       setSuccess(false)
     }
   }, [project, isOpen])
@@ -40,16 +42,33 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
+    setFieldErrors({})
     setSuccess(false)
 
     if (!name.trim()) {
+      setFieldErrors({ name: 'Project name is required.' })
       setError('Project name is required.')
       return
     }
 
     if (!repoUrl.trim()) {
+      setFieldErrors({ repoUrl: 'Git repository URL is required.' })
       setError('Git repository URL is required.')
       return
+    }
+
+    let cleanRepoUrl = repoUrl.trim().replace(/^["']+|["']+$/g, '')
+    if (cleanRepoUrl.startsWith('github_pat_') || cleanRepoUrl.startsWith('ghp_')) {
+      if (!cleanRepoUrl.includes('@')) {
+        setFieldErrors({ repoUrl: 'This is only an access token. Use format: https://<token>@github.com/<owner>/<repo>.git' })
+        setError('You entered an access token without a repository URL.')
+        return
+      }
+    }
+    if (!cleanRepoUrl.startsWith('http://') && !cleanRepoUrl.startsWith('https://') && !cleanRepoUrl.startsWith('git@') && !cleanRepoUrl.startsWith('ssh://')) {
+      if (cleanRepoUrl.includes('github.com') || cleanRepoUrl.includes('gitlab.com') || cleanRepoUrl.includes('bitbucket.org') || cleanRepoUrl.includes('@')) {
+        cleanRepoUrl = `https://${cleanRepoUrl}`
+      }
     }
 
     setIsSubmitting(true)
@@ -68,7 +87,7 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
       // Backend project schema strictly expects name, repoUrl, defaultBranch, autoDeploy
       const payload = {
         name: name.trim(),
-        repoUrl: repoUrl.trim(),
+        repoUrl: cleanRepoUrl,
         defaultBranch: defaultBranch.trim() || 'main',
         autoDeploy: Boolean(autoDeploy),
       }
@@ -88,10 +107,16 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
     } catch (err) {
       console.error('Failed to update project:', err)
       if (err.details?.fields && Array.isArray(err.details.fields)) {
-        const fieldMsgs = err.details.fields
-          .map((f) => `${f.field.replace(/^(body|query|params)\./, '')}: ${f.message}`)
-          .join(', ')
-        setError(fieldMsgs || err.message || 'Failed to update project.')
+        const mapped = {}
+        for (const f of err.details.fields) {
+          const key = f.field.replace(/^(body|query|params)\./, '')
+          if (key) mapped[key] = f.message
+        }
+        setFieldErrors(mapped)
+        const fieldMsgs = Object.entries(mapped)
+          .map(([k, msg]) => `${k.toUpperCase()}: ${msg}`)
+          .join(' • ')
+        setError(fieldMsgs || err.message || 'Validation failed. Please check the highlighted fields.')
       } else {
         setError(err.message || 'Failed to update project. Please check your inputs.')
       }
@@ -148,11 +173,24 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value)
+                if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: null }))
+              }}
               placeholder="e.g. checkout-service"
-              className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
+              className={`w-full h-[36px] px-3 bg-[#FFFFFF] border rounded-[6px] text-[13px] text-[#101d26] outline-none transition-colors ${
+                fieldErrors.name
+                  ? 'border-[#C2412D] bg-[#FFF8F7] focus:ring-2 focus:ring-[#C2412D]/20'
+                  : 'border-[#CDD4D0] focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15'
+              }`}
               required
             />
+            {fieldErrors.name && (
+              <p className="text-[11px] text-[#C2412D] mt-1 flex items-center gap-1 font-mono">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.name}</span>
+              </p>
+            )}
           </div>
 
           {/* Project Framework */}
@@ -181,16 +219,29 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
               GIT REPOSITORY URL <span className="text-[#C2412D]">*</span>
             </label>
             <div className="relative flex items-center">
-              <FolderGit2 className="w-3.5 h-3.5 text-[#565f6b] absolute left-3 pointer-events-none" />
+              <FolderGit2 className={`w-3.5 h-3.5 absolute left-3 pointer-events-none ${fieldErrors.repoUrl ? 'text-[#C2412D]' : 'text-[#565f6b]'}`} />
               <input
                 type="text"
                 value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
+                onChange={(e) => {
+                  setRepoUrl(e.target.value)
+                  if (fieldErrors.repoUrl) setFieldErrors((prev) => ({ ...prev, repoUrl: null }))
+                }}
                 placeholder="https://github.com/org/repo.git or git@github.com:..."
-                className="w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
+                className={`w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none transition-colors ${
+                  fieldErrors.repoUrl
+                    ? 'border-[#C2412D] bg-[#FFF8F7] focus:ring-2 focus:ring-[#C2412D]/20'
+                    : 'border-[#CDD4D0] focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15'
+                }`}
                 required
               />
             </div>
+            {fieldErrors.repoUrl && (
+              <p className="text-[11px] text-[#C2412D] mt-1 flex items-center gap-1 font-mono">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.repoUrl}</span>
+              </p>
+            )}
           </div>
 
           {/* Default Branch */}
@@ -199,15 +250,28 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
               DEFAULT DEPLOYMENT BRANCH
             </label>
             <div className="relative flex items-center">
-              <GitBranch className="w-3.5 h-3.5 text-[#565f6b] absolute left-3 pointer-events-none" />
+              <GitBranch className={`w-3.5 h-3.5 absolute left-3 pointer-events-none ${fieldErrors.defaultBranch ? 'text-[#C2412D]' : 'text-[#565f6b]'}`} />
               <input
                 type="text"
                 value={defaultBranch}
-                onChange={(e) => setDefaultBranch(e.target.value)}
+                onChange={(e) => {
+                  setDefaultBranch(e.target.value)
+                  if (fieldErrors.defaultBranch) setFieldErrors((prev) => ({ ...prev, defaultBranch: null }))
+                }}
                 placeholder="main"
-                className="w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
+                className={`w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none transition-colors ${
+                  fieldErrors.defaultBranch
+                    ? 'border-[#C2412D] bg-[#FFF8F7] focus:ring-2 focus:ring-[#C2412D]/20'
+                    : 'border-[#CDD4D0] focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15'
+                }`}
               />
             </div>
+            {fieldErrors.defaultBranch && (
+              <p className="text-[11px] text-[#C2412D] mt-1 flex items-center gap-1 font-mono">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span>{fieldErrors.defaultBranch}</span>
+              </p>
+            )}
           </div>
 
           {/* Project URL / Domain */}

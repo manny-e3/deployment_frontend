@@ -418,6 +418,165 @@ if [ -f "package.json" ]; then
 fi`
   },
   {
+    id: 'windows-node',
+    framework: 'node',
+    label: '🪟 Windows Node.js API (XAMPP / Apache)',
+    desc: 'Runs npm install, migrations, background Scheduled Task runner, and Apache reverse proxy',
+    architecture: 'windows-node',
+    script: [
+      '# -------------------------------------------------------------',
+      '# Windows Server / XAMPP Deployment (Node.js API)',
+      '# -------------------------------------------------------------',
+      'export PATH="/c/Program Files/nodejs:/c/Program Files/Git/cmd:/c/Program Files/Git/bin:$PATH"',
+      'export MSYS_NO_PATHCONV=1',
+      'export MSYS2_ARG_CONV_EXCL="*"',
+      '',
+      'echo "Installing Node.js dependencies..."',
+      'npm install',
+      '',
+      'if [ -f "prisma/schema.prisma" ]; then',
+      '  echo "Applying Prisma database migrations..."',
+      '  npx prisma migrate deploy || true',
+      'elif [ -f "knexfile.js" ]; then',
+      '  echo "Applying Knex database migrations..."',
+      '  npx knex migrate:latest || true',
+      'fi',
+      '',
+      'NODE_PORT=$(grep -E \'^[[:space:]]*PORT=\' .env 2>/dev/null | head -n 1 | cut -d \'=\' -f 2 | tr -d \'"\\r\\n \' || echo "")',
+      '[ -z "$NODE_PORT" ] && NODE_PORT="8000"',
+      '',
+      'DIR_BASENAME=$(basename "$(pwd)")',
+      'TASK_NAME="Task_${DIR_BASENAME}"',
+      '',
+      'ENTRY="src/server.js"',
+      '[ -f "server.js" ] && ENTRY="server.js"',
+      '[ -f "index.js" ] && ENTRY="index.js"',
+      '[ -f "app.js" ] && ENTRY="app.js"',
+      '',
+      'WIN_DIR="C:${PWD#/c}"',
+      'WIN_DIR="${WIN_DIR//\\//\\\\\\\\}"',
+      'WIN_ENTRY="${ENTRY//\\//\\\\\\\\}"',
+      '',
+      'echo "Configuring Apache reverse proxy..."',
+      'cat << \'HTACCESS_EOF\' > .htaccess',
+      'Options -Indexes',
+      'DirectoryIndex disabled',
+      '',
+      '<IfModule mod_rewrite.c>',
+      '  RewriteEngine On',
+      '  RewriteCond %{HTTP:Upgrade} websocket [NC]',
+      '  RewriteCond %{HTTP:Connection} upgrade [NC]',
+      '  RewriteRule ^(.*)$ ws://127.0.0.1:__PORT__/$1 [P,L]',
+      '  RewriteRule ^(index\\.php)?$ http://127.0.0.1:__PORT__/ [P,L]',
+      '  RewriteRule ^(.*)$ http://127.0.0.1:__PORT__/$1 [P,L,QSA]',
+      '</IfModule>',
+      'HTACCESS_EOF',
+      'sed -i "s/__PORT__/$NODE_PORT/g" .htaccess',
+      '',
+      'echo "Configuring persistent Windows background runner..."',
+      'cat << START_CMD_EOF > start_service.cmd',
+      '@echo off',
+      'cd /d "${WIN_DIR}"',
+      '"C:\\Program Files\\nodejs\\node.exe" ${WIN_ENTRY} >> "${WIN_DIR}\\server.log" 2>&1',
+      'START_CMD_EOF',
+      '',
+      'cmd.exe /c "schtasks /query /tn \\"$TASK_NAME\\" >nul 2>&1 || schtasks /create /tn \\"$TASK_NAME\\" /tr \\"${WIN_DIR}\\start_service.cmd\\" /sc onstart /ru SYSTEM /f" 2>/dev/null || true',
+      '',
+      'echo "Restarting Node.js service on port $NODE_PORT..."',
+      'cmd.exe /c "powershell -Command \\"Stop-Process -Id (Get-NetTCPConnection -LocalPort $NODE_PORT).OwningProcess -Force -ErrorAction SilentlyContinue\\"" 2>/dev/null || true',
+      'cmd.exe /c "schtasks /run /tn \\"$TASK_NAME\\""',
+      '',
+      'echo "Node.js API active and reverse-proxied via Apache on port $NODE_PORT."'
+    ].join('\n')
+  },
+  {
+    id: 'windows-spa',
+    framework: 'react',
+    label: '🪟 Windows React / Vite SPA (XAMPP / Apache)',
+    desc: 'Compiles production bundle, syncs dist/ into Apache root, and enables client-side routing',
+    architecture: 'windows-spa',
+    script: [
+      '# -------------------------------------------------------------',
+      '# Windows Server / XAMPP Deployment (React / Vite / Vue / SPA)',
+      '# -------------------------------------------------------------',
+      'export PATH="/c/Program Files/nodejs:/c/Program Files/Git/cmd:/c/Program Files/Git/bin:$PATH"',
+      'export MSYS_NO_PATHCONV=1',
+      'export MSYS2_ARG_CONV_EXCL="*"',
+      '',
+      'echo "Installing dependencies..."',
+      'npm install',
+      '',
+      'echo "Compiling production bundle..."',
+      'npm run build -- --base=./ 2>/dev/null || npm run build',
+      '',
+      '# Sync compiled assets into Apache document root',
+      'if [ -d "dist" ]; then',
+      '  echo "Deploying dist/ assets to web root..."',
+      '  cp -rf dist/* .',
+      'elif [ -d "build" ]; then',
+      '  echo "Deploying build/ assets to web root..."',
+      '  cp -rf build/* .',
+      'fi',
+      '',
+      '# Normalize relative asset paths for Apache subdirectory hosting',
+      'if [ -f "index.html" ]; then',
+      '  sed -i -E \'s/(href|src)="\\/assets\\//\\1=".\\/assets\\//g\' index.html 2>/dev/null || true',
+      '  sed -i -E \'s/(href|src)="\\/favicon/\\1=".\\/favicon/g\' index.html 2>/dev/null || true',
+      '  sed -i -E \'s/<base href="\\/"/<base href=".\\/"/g\' index.html 2>/dev/null || true',
+      'fi',
+      '',
+      'DIR_BASENAME=$(basename "$(pwd)")',
+      '',
+      'echo "Configuring Apache SPA fallback routing (.htaccess)..."',
+      'cat << \'HTACCESS_EOF\' > .htaccess',
+      'Options -Indexes',
+      '<IfModule mod_rewrite.c>',
+      '  RewriteEngine On',
+      '  RewriteBase /__SUBDIR__/',
+      '  RewriteRule ^index\\.html$ - [L]',
+      '  RewriteCond %{REQUEST_FILENAME} !-f',
+      '  RewriteCond %{REQUEST_FILENAME} !-d',
+      '  RewriteRule . index.html [L]',
+      '</IfModule>',
+      'HTACCESS_EOF',
+      'sed -i "s/__SUBDIR__/$DIR_BASENAME/g" .htaccess',
+      '',
+      'echo "Windows SPA deployment complete! Available at http://localhost/$DIR_BASENAME/"'
+    ].join('\n')
+  },
+  {
+    id: 'windows-laravel',
+    framework: 'laravel',
+    label: '🪟 Windows Laravel / PHP (XAMPP / Apache)',
+    desc: 'Composer install, artisan migrate, and Apache .htaccess routing for Windows XAMPP',
+    architecture: 'windows-php',
+    script: `# -------------------------------------------------------------
+# Windows Server / XAMPP Deployment (Laravel / PHP)
+# -------------------------------------------------------------
+export PATH="/c/xampp/php:/c/ProgramData/ComposerSetup/bin:/c/Program Files/Git/cmd:$PATH"
+
+if [ -f "composer.json" ]; then
+  echo "Installing Composer dependencies..."
+  composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev || true
+fi
+
+if [ -f "artisan" ]; then
+  echo "Running database migrations..."
+  php artisan migrate --force || true
+  php artisan optimize:clear || true
+fi
+
+echo "Ensuring storage and cache folders exist..."
+mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache 2>/dev/null || true
+
+echo "Configuring Apache .htaccess..."
+if [ -f "public/.htaccess" ] && [ ! -f ".htaccess" ]; then
+  cp -f public/.htaccess .htaccess
+fi
+
+echo "Windows Laravel deployment complete."`
+  },
+  {
     id: 'node',
     framework: 'node',
     label: '🟢 Node.js / Express',
@@ -463,6 +622,50 @@ export function AddTargetModal({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
+  const isWindowsServer = (server) => {
+    if (!server) return false
+    const name = (server.name || '').toLowerCase()
+    const host = (server.host || '').toLowerCase()
+    return (
+      name.includes('windows') ||
+      name.includes('fmdq') ||
+      name.includes('xampp') ||
+      host === '10.10.15.59' ||
+      host === '101-php-01.fmdqgroup.com'
+    )
+  }
+
+  const selectBestPresetForServer = (server, currentFramework) => {
+    if (server?.serverType === 'CPANEL_SFTP' || server?.iconType === 'cpanel' || server?.host === 'travaiq.com') {
+      return TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
+    }
+    if (server?.serverType === 'DOCKER' || server?.iconType === 'docker') {
+      return TARGET_PRESETS.find((p) => p.id === 'docker-compose')
+    }
+    if (isWindowsServer(server)) {
+      if (currentFramework === 'node') {
+        return TARGET_PRESETS.find((p) => p.id === 'windows-node')
+      }
+      if (currentFramework === 'react') {
+        return TARGET_PRESETS.find((p) => p.id === 'windows-spa')
+      }
+      if (currentFramework === 'laravel') {
+        return TARGET_PRESETS.find((p) => p.id === 'windows-laravel')
+      }
+      return TARGET_PRESETS.find((p) => p.id === 'windows-node') || TARGET_PRESETS.find((p) => p.id === 'windows-spa')
+    }
+    return TARGET_PRESETS.find((p) => p.framework === currentFramework) || TARGET_PRESETS[0]
+  }
+
+  const applyPresetForServer = (srv) => {
+    const chosen = selectBestPresetForServer(srv, projectFramework)
+    if (chosen) {
+      setSelectedPresetId(chosen.id)
+      setPostDeploy(chosen.script)
+      setIsAtomicSymlink(chosen.architecture === 'atomic-symlink')
+    }
+  }
+
   useEffect(() => {
     if (!isOpen) return
     setError(null)
@@ -494,21 +697,7 @@ export function AddTargetModal({
           const first = valid[0]
           setServerId(first.id)
           setName(`Production (${first.name || first.host})`)
-          if (first.serverType === 'CPANEL_SFTP' || first.iconType === 'cpanel' || first.host === 'travaiq.com') {
-            const cpanelPreset = TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
-            if (cpanelPreset) {
-              setSelectedPresetId(cpanelPreset.id)
-              setPostDeploy(cpanelPreset.script)
-              setIsAtomicSymlink(false)
-            }
-          } else if (first.serverType === 'DOCKER' || first.iconType === 'docker') {
-            const dockerPreset = TARGET_PRESETS.find((p) => p.id === 'docker-compose')
-            if (dockerPreset) {
-              setSelectedPresetId(dockerPreset.id)
-              setPostDeploy(dockerPreset.script)
-              setIsAtomicSymlink(false)
-            }
-          }
+          applyPresetForServer(first)
         }
       } catch (err) {
         console.error('Failed to fetch servers for target modal:', err)
@@ -528,21 +717,7 @@ export function AddTargetModal({
     const found = servers.find((s) => s.id === newServerId)
     if (found) {
       setName(`Production (${found.name || found.host})`)
-      if (found.serverType === 'CPANEL_SFTP' || found.iconType === 'cpanel' || found.host === 'travaiq.com') {
-        const cpanelPreset = TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
-        if (cpanelPreset) {
-          setSelectedPresetId(cpanelPreset.id)
-          setPostDeploy(cpanelPreset.script)
-          setIsAtomicSymlink(false)
-        }
-      } else if (found.serverType === 'DOCKER' || found.iconType === 'docker') {
-        const dockerPreset = TARGET_PRESETS.find((p) => p.id === 'docker-compose')
-        if (dockerPreset) {
-          setSelectedPresetId(dockerPreset.id)
-          setPostDeploy(dockerPreset.script)
-          setIsAtomicSymlink(false)
-        }
-      }
+      applyPresetForServer(found)
     }
   }
 
@@ -854,6 +1029,11 @@ export function AddTargetModal({
                       {preset.architecture === 'docker' && (
                         <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
                           Daemon
+                        </span>
+                      )}
+                      {preset.architecture.startsWith('windows') && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
+                          Windows
                         </span>
                       )}
                     </div>

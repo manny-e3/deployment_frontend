@@ -162,7 +162,14 @@ export function CreateProjectView() {
         navigate(`/projects/${res?.id || ''}`, { state: { framework: selectedFramework } })
       }
     } catch (err) {
-      setSubmitError(err.message || 'Failed to create project. Please try again.')
+      if (err.details?.fields && Array.isArray(err.details.fields)) {
+        const detailsMsg = err.details.fields
+          .map((f) => `${f.field.replace(/^(body|query|params)\./, '')}: ${f.message}`)
+          .join(', ')
+        setSubmitError(detailsMsg || err.message || 'Validation failed.')
+      } else {
+        setSubmitError(err.message || 'Failed to create project. Please try again.')
+      }
     } finally {
       setIsSubmitting(false)
     }

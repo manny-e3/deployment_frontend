@@ -56,6 +56,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:9000'
 
   return {
+    base: './',
     plugins: [
       tailwindcss(),
       react(),
