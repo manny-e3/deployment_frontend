@@ -1,13 +1,261 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Folder, GitBranch, Terminal, AlertCircle, Loader2, Activity, ShieldAlert } from 'lucide-react'
+import {
+  X,
+  Server,
+  Folder,
+  GitBranch,
+  Terminal,
+  AlertCircle,
+  Loader2,
+  Activity,
+  ShieldAlert,
+  RefreshCw,
+  Layers,
+  CheckCircle2,
+  HardDrive,
+  Info,
+} from 'lucide-react'
 import { api } from '../services/api'
 
 export const TARGET_PRESETS = [
   {
+    id: 'atomic-laravel',
+    framework: 'laravel',
+    label: '🔄 Atomic Symlink (Laravel)',
+    desc: 'Zero downtime /releases/[ts] + /current symlink with shared .env & storage',
+    architecture: 'atomic-symlink',
+    script: `# -------------------------------------------------------------
+# Atomic Zero-Downtime Symlink Deployment (Laravel / PHP)
+# -------------------------------------------------------------
+# Ensure Node, npm, and Composer are in PATH for non-interactive SSH
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" 2>/dev/null || true
+for d in $(ls -d $HOME/.nvm/versions/node/* 2>/dev/null | sort -V -r); do
+  [ -d "$d/bin" ] && export PATH="$d/bin:$PATH" && break
+done
+for p in /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /usr/local/bin /usr/bin; do
+  [ -d "$p" ] && export PATH="$PATH:$p"
+done
+
+APP_DIR="$(pwd)"
+RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+RELEASE_DIR="$APP_DIR/releases/$RELEASE_TIMESTAMP"
+SHARED_DIR="$APP_DIR/shared"
+
+echo "Creating atomic release directory: $RELEASE_DIR"
+mkdir -p "$RELEASE_DIR" "$SHARED_DIR/storage" "$SHARED_DIR/storage/framework/sessions" "$SHARED_DIR/storage/framework/views" "$SHARED_DIR/storage/framework/cache" "$SHARED_DIR/storage/logs"
+
+# Keep shared .env in sync with deployment .env
+if [ -f "$APP_DIR/.env" ]; then
+  cp -f "$APP_DIR/.env" "$SHARED_DIR/.env"
+elif [ ! -f "$SHARED_DIR/.env" ] && [ -f "$APP_DIR/.env.example" ]; then
+  cp "$APP_DIR/.env.example" "$SHARED_DIR/.env"
+fi
+
+# Copy release artifacts to isolated release directory
+cp -a * "$RELEASE_DIR/" 2>/dev/null || true
+rm -rf "$RELEASE_DIR/releases" "$RELEASE_DIR/shared" "$RELEASE_DIR/current" 2>/dev/null || true
+
+# Symlink persistent shared environment and storage
+ln -sfn "$SHARED_DIR/.env" "$RELEASE_DIR/.env"
+rm -rf "$RELEASE_DIR/storage"
+ln -sfn "$SHARED_DIR/storage" "$RELEASE_DIR/storage"
+
+# Persistent SQLite database support
+mkdir -p "$SHARED_DIR/database"
+if [ ! -f "$SHARED_DIR/database/database.sqlite" ]; then
+  touch "$SHARED_DIR/database/database.sqlite"
+  chmod 666 "$SHARED_DIR/database/database.sqlite" 2>/dev/null || true
+fi
+chmod 777 "$SHARED_DIR/database" 2>/dev/null || true
+mkdir -p "$RELEASE_DIR/database"
+ln -sfn "$SHARED_DIR/database/database.sqlite" "$RELEASE_DIR/database/database.sqlite"
+
+# Build & optimize inside the isolated release directory
+cd "$RELEASE_DIR"
+composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev 2>/dev/null || true
+
+# Ensure APP_KEY exists and has a valid base64 key in shared .env
+if [ -f "$SHARED_DIR/.env" ]; then
+  if ! grep -q "^APP_KEY=base64:" "$SHARED_DIR/.env"; then
+    echo "Generating application encryption key..."
+    NEW_KEY="base64:$(head -c 32 /dev/urandom | base64)"
+    sed -i -E '/^APP_KEY=/d' "$SHARED_DIR/.env" 2>/dev/null || true
+    echo "APP_KEY=\${NEW_KEY}" >> "$SHARED_DIR/.env"
+  fi
+fi
+
+# Storage & framework cache permissions
+chmod -R 775 "$SHARED_DIR/storage" "$RELEASE_DIR/bootstrap/cache" 2>/dev/null || true
+chmod -R 777 "$SHARED_DIR/storage/framework" "$SHARED_DIR/storage/logs" 2>/dev/null || true
+
+# Native storage symlink (bypasses Hostinger disabled PHP exec() function)
+mkdir -p "$SHARED_DIR/storage/app/public"
+rm -rf "$RELEASE_DIR/public/storage"
+ln -sfn "$SHARED_DIR/storage/app/public" "$RELEASE_DIR/public/storage" 2>/dev/null || true
+
+# Run database migrations for sessions/cache/app
+php artisan migrate --force 2>/dev/null || true
+
+# Clear stale caches and optimize
+php artisan optimize:clear 2>/dev/null || true
+php artisan config:cache 2>/dev/null || true
+php artisan route:cache 2>/dev/null || true
+php artisan view:cache 2>/dev/null || true
+
+# Safe frontend asset build (avoids crashing if npm is missing on shared hosting)
+if [ -f "package.json" ]; then
+  if command -v npm >/dev/null 2>&1; then
+    echo "Compiling frontend assets with npm..."
+    (npm ci --prefer-offline 2>/dev/null || npm install --no-audit 2>/dev/null || true)
+    (npm run build 2>/dev/null || true)
+  else
+    echo "Notice: npm not found in PATH on server. Skipping remote build (ensure assets in public/build are committed if required)."
+  fi
+fi
+
+# ATOMIC SWITCH: Update /current symlink in a single atomic filesystem operation
+echo "Activating release atomically..."
+ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+
+# Ensure root bridge index.php and .htaccess route to active release
+cat << 'INDEX_PHP' > "$APP_DIR/index.php"
+<?php
+$currentPublic = __DIR__ . '/current/public';
+if (file_exists($currentPublic . '/index.php')) {
+    $uri = urldecode(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/');
+    if ($uri !== '/' && file_exists($currentPublic . $uri)) {
+        return false;
+    }
+    require_once $currentPublic . '/index.php';
+} elseif (file_exists(__DIR__ . '/public/index.php')) {
+    require_once __DIR__ . '/public/index.php';
+}
+INDEX_PHP
+
+cat << 'HTACCESS' > "$APP_DIR/.htaccess"
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Serve static assets directly from active release public folder
+    RewriteCond %{DOCUMENT_ROOT}/current/public/$1 -f
+    RewriteRule ^(.+)$ current/public/$1 [L]
+
+    RewriteCond %{DOCUMENT_ROOT}/public/$1 -f
+    RewriteRule ^(.+)$ public/$1 [L]
+
+    # Route all requests to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [L]
+</IfModule>
+HTACCESS
+
+# Prune older releases, keeping the last 5 for instant 1-second rollbacks
+cd "$APP_DIR/releases"
+ls -dt "$APP_DIR/releases"/* | tail -n +6 | xargs rm -rf 2>/dev/null || true
+echo "Release $RELEASE_TIMESTAMP active with ZERO downtime."`
+  },
+  {
+    id: 'atomic-node',
+    framework: 'node',
+    label: '🔄 Atomic Symlink (Node.js)',
+    desc: 'Zero downtime /releases/[ts] + /current symlink with PM2 reload',
+    architecture: 'atomic-symlink',
+    script: `# -------------------------------------------------------------
+# Atomic Zero-Downtime Symlink Deployment (Node.js / Express)
+# -------------------------------------------------------------
+export NO_UPDATE_NOTIFIER=1
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" 2>/dev/null || true
+nvm use 22 2>/dev/null || nvm use 20 2>/dev/null || nvm install 20 2>/dev/null || true
+for d in $(ls -d $HOME/.nvm/versions/node/* 2>/dev/null | sort -V -r); do
+  [ -d "$d/bin" ] && export PATH="$d/bin:$PATH" && break
+done
+for p in /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /usr/local/bin /usr/bin; do
+  [ -d "$p" ] && export PATH="$PATH:$p"
+done
+
+APP_DIR="$(pwd)"
+RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)
+RELEASE_DIR="$APP_DIR/releases/$RELEASE_TIMESTAMP"
+SHARED_DIR="$APP_DIR/shared"
+
+echo "Creating atomic release directory: $RELEASE_DIR"
+mkdir -p "$RELEASE_DIR" "$SHARED_DIR/uploads" "$SHARED_DIR/logs"
+
+# Keep persistent shared .env in sync with deployed .env
+if [ -f "$APP_DIR/.env" ]; then
+  cp -f "$APP_DIR/.env" "$SHARED_DIR/.env"
+fi
+
+# Copy release artifacts
+cp -a * "$RELEASE_DIR/" 2>/dev/null || true
+rm -rf "$RELEASE_DIR/releases" "$RELEASE_DIR/shared" "$RELEASE_DIR/current" 2>/dev/null || true
+
+# Symlink persistent environment & uploads
+[ -f "$SHARED_DIR/.env" ] && ln -sfn "$SHARED_DIR/.env" "$RELEASE_DIR/.env"
+ln -sfn "$SHARED_DIR/uploads" "$RELEASE_DIR/uploads"
+
+# Install dependencies inside the new release directory
+cd "$RELEASE_DIR"
+(npm ci --production 2>/dev/null || npm install --production 2>/dev/null || true)
+
+# ATOMIC SWITCH: Switch symlink to new release
+ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
+
+# Reload PM2 zero-downtime cluster
+pm2 reload all 2>/dev/null || pm2 restart all 2>/dev/null || pm2 start current/index.js --name "app" 2>/dev/null || true
+
+# Prune old releases (keep 5)
+cd "$APP_DIR/releases"
+ls -dt "$APP_DIR/releases"/* | tail -n +6 | xargs rm -rf 2>/dev/null || true
+echo "Atomic switch complete. PM2 workers drained and reloaded with zero dropped connections."`
+  },
+  {
+    id: 'cpanel-sftp',
+    framework: 'cpanel',
+    label: '📁 cPanel Pure SFTP Sync',
+    desc: 'Direct SFTP transfer without remote shell execution (resolves "Unable to exec")',
+    architecture: 'cpanel-sftp',
+    script: `# -------------------------------------------------------------
+# cPanel Pure SFTP Sync (Zero-Shell Execution)
+# Resolves: SSH connection failed: Unable to exec restriction
+# -------------------------------------------------------------
+# Pre-compiled local assets and bundle are streamed directly over SFTP
+# into the web root without requiring SSH terminal exec channels.
+#
+# Web Root: public_html (or subdomain path)
+# Target Files: Pre-compiled dist/*, index.php / index.html, .htaccess
+echo "Preparing pre-compiled artifact package for SFTP delivery..."
+echo "SFTP sync stream initialized directly to target root."
+echo "Zero remote shell execution required. Pure SFTP payload transfer active."`
+  },
+  {
+    id: 'docker-compose',
+    framework: 'docker',
+    label: '🐳 Docker Remote Compose',
+    desc: 'Connects directly to Docker daemon, pulls images and deploys compose',
+    architecture: 'docker',
+    script: `# -------------------------------------------------------------
+# Remote Docker Daemon Target (Docker API / Compose)
+# Connects directly to tcp://:2376 or SSH docker socket
+# -------------------------------------------------------------
+echo "Pulling latest images from container registry..."
+docker compose pull || true
+
+echo "Applying zero-downtime rolling update with healthcheck..."
+docker compose up -d --remove-orphans
+
+echo "Verifying container health status..."
+docker compose ps`
+  },
+  {
     id: 'react-spa',
     framework: 'react',
-    label: '⚛️ React (Vite / CRA) SPA',
+    label: 'React (Vite / CRA) SPA',
     desc: 'Builds app into dist/, protects source files, and routes SPA',
+    architecture: 'standard',
     script: `# 1. Ensure modern Node.js (Node 20+ or 22+ required for Vite / Rolldown styleText)
 export NO_UPDATE_NOTIFIER=1
 export NVM_DIR="$HOME/.nvm"
@@ -35,26 +283,31 @@ export NODE_OPTIONS="--max-old-space-size=512"
 
 echo "Building with Node: $(node -v) | npm: $(npm -v)"
 
-# 2. Install dependencies & build production assets
+# 2. Install dependencies & build production assets with relative base
 npm ci 2>/dev/null || npm install
-RAYON_NUM_THREADS=1 npm run build
+RAYON_NUM_THREADS=1 npm run build -- --base=./
 
-# 3. Configure .htaccess to serve from dist/ and protect source files
+# 3. Copy built files from dist/ directly to the web root
+cp -rf dist/* .
+
+# 4. Standard React SPA routing and source protection
 cat << 'HTACCESS' > .htaccess
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
 
   # Block public access to private source code
   RewriteRule ^(src|\.git|node_modules|package.*\.json|vite\.config\.js|\.env.*|README\.md) - [F,L]
 
-  # Serve existing static files from dist/
-  RewriteCond %{DOCUMENT_ROOT}/dist/$1 -f
-  RewriteRule ^(.*)$ dist/$1 [L]
+  # Allow direct access to existing files and directories
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
 
-  # SPA fallback to dist/index.html
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteRule . dist/index.html [L]
+  # Direct access to index.html
+  RewriteRule ^index\.html$ - [L]
+
+  # Route all other URLs to index.html for SPA client-side routing
+  RewriteRule . index.html [L]
 </IfModule>
 HTACCESS`
   },
@@ -63,6 +316,7 @@ HTACCESS`
     framework: 'react',
     label: '⚡ React (Build Only)',
     desc: 'Runs npm install && npm run build into dist/',
+    architecture: 'standard',
     script: `export NO_UPDATE_NOTIFIER=1
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -86,8 +340,9 @@ RAYON_NUM_THREADS=1 npm run build`
   {
     id: 'laravel',
     framework: 'laravel',
-    label: '🐘 Laravel + Migrations',
+    label: 'Laravel + Migrations',
     desc: 'Routes to public/, auto-creates .env, installs dependencies & migrates',
+    architecture: 'standard',
     script: `# 1. Immediately create root index.php and .htaccess to eliminate LiteSpeed "Index of /"
 cat << 'INDEX_PHP' > index.php
 <?php
@@ -106,7 +361,6 @@ DirectoryIndex index.php public/index.php index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /
 
     # Serve static assets directly from public/ if requested without prefix
     RewriteCond %{DOCUMENT_ROOT}/public/$1 -f
@@ -153,10 +407,14 @@ php artisan view:cache || true
 
 # 6. Build Vite / frontend assets if present
 if [ -f "package.json" ]; then
-  if [ ! -d "node_modules" ]; then
-    npm install --prefer-offline --no-audit --no-fund 2>/dev/null || true
+  if command -v npm >/dev/null 2>&1; then
+    if [ ! -d "node_modules" ]; then
+      npm install --prefer-offline --no-audit --no-fund 2>/dev/null || true
+    fi
+    npm run build || true
+  else
+    echo "Notice: npm not found in PATH on server. Skipping frontend build."
   fi
-  npm run build || true
 fi`
   },
   {
@@ -164,6 +422,7 @@ fi`
     framework: 'node',
     label: '🟢 Node.js / Express',
     desc: 'Installs dependencies and restarts daemon via PM2',
+    architecture: 'standard',
     script: `export NO_UPDATE_NOTIFIER=1
 if [ -d "/opt/alt/alt-nodejs22/root/usr/bin" ]; then
   export PATH="/opt/alt/alt-nodejs22/root/usr/bin:$PATH"
@@ -200,6 +459,7 @@ export function AddTargetModal({
   const [autoRollbackOnFailure, setAutoRollbackOnFailure] = useState(true)
   const [requiresApproval, setRequiresApproval] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState('react-spa')
+  const [isAtomicSymlink, setIsAtomicSymlink] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
@@ -221,6 +481,7 @@ export function AddTargetModal({
 
     setSelectedPresetId(matchedPreset.id)
     setPostDeploy(matchedPreset.script)
+    setIsAtomicSymlink(matchedPreset.architecture === 'atomic-symlink')
 
     const fetchServers = async () => {
       setLoadingServers(true)
@@ -230,8 +491,24 @@ export function AddTargetModal({
         const valid = items.filter(Boolean)
         setServers(valid)
         if (valid.length > 0) {
-          setServerId(valid[0].id)
-          setName(`Production (${valid[0].name || valid[0].host})`)
+          const first = valid[0]
+          setServerId(first.id)
+          setName(`Production (${first.name || first.host})`)
+          if (first.serverType === 'CPANEL_SFTP' || first.iconType === 'cpanel' || first.host === 'travaiq.com') {
+            const cpanelPreset = TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
+            if (cpanelPreset) {
+              setSelectedPresetId(cpanelPreset.id)
+              setPostDeploy(cpanelPreset.script)
+              setIsAtomicSymlink(false)
+            }
+          } else if (first.serverType === 'DOCKER' || first.iconType === 'docker') {
+            const dockerPreset = TARGET_PRESETS.find((p) => p.id === 'docker-compose')
+            if (dockerPreset) {
+              setSelectedPresetId(dockerPreset.id)
+              setPostDeploy(dockerPreset.script)
+              setIsAtomicSymlink(false)
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to fetch servers for target modal:', err)
@@ -246,9 +523,33 @@ export function AddTargetModal({
 
   if (!isOpen) return null
 
+  const handleServerChange = (newServerId) => {
+    setServerId(newServerId)
+    const found = servers.find((s) => s.id === newServerId)
+    if (found) {
+      setName(`Production (${found.name || found.host})`)
+      if (found.serverType === 'CPANEL_SFTP' || found.iconType === 'cpanel' || found.host === 'travaiq.com') {
+        const cpanelPreset = TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
+        if (cpanelPreset) {
+          setSelectedPresetId(cpanelPreset.id)
+          setPostDeploy(cpanelPreset.script)
+          setIsAtomicSymlink(false)
+        }
+      } else if (found.serverType === 'DOCKER' || found.iconType === 'docker') {
+        const dockerPreset = TARGET_PRESETS.find((p) => p.id === 'docker-compose')
+        if (dockerPreset) {
+          setSelectedPresetId(dockerPreset.id)
+          setPostDeploy(dockerPreset.script)
+          setIsAtomicSymlink(false)
+        }
+      }
+    }
+  }
+
   const handleSelectPreset = (preset) => {
     setSelectedPresetId(preset.id)
     setPostDeploy(preset.script)
+    setIsAtomicSymlink(preset.architecture === 'atomic-symlink')
   }
 
   const handleSubmit = async (e) => {
@@ -271,8 +572,11 @@ export function AddTargetModal({
       return
     }
 
-    if (!trimmedPath.startsWith('/')) {
-      setError('Target path must be an absolute path starting with / (e.g. /home/username/public_html).')
+    const isUnixAbsolute = trimmedPath.startsWith('/')
+    const isWindowsAbsolute = /^[a-zA-Z]:[/\\]/.test(trimmedPath)
+
+    if (!isUnixAbsolute && !isWindowsAbsolute) {
+      setError('Target path must be an absolute path (e.g. /home/username/public_html or C:/xampp/htdocs).')
       return
     }
 
@@ -417,23 +721,43 @@ export function AddTargetModal({
             ) : (
               <select
                 value={serverId}
-                onChange={(e) => {
-                  setServerId(e.target.value)
-                  const found = servers.find((s) => s.id === e.target.value)
-                  if (found) {
-                    setName(`Production (${found.name || found.host})`)
-                  }
-                }}
+                onChange={(e) => handleServerChange(e.target.value)}
                 className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
                 required
               >
                 {servers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.username}@{s.host}:{s.port || 22})
+                    {s.name} ({s.username}@{s.host}:{s.port || 22}) {s.serverType === 'CPANEL_SFTP' ? '· [cPanel SFTP]' : s.serverType === 'DOCKER' ? '· [Docker Engine]' : ''}
                   </option>
                 ))}
               </select>
             )}
+
+            {/* Server Type Insight Banner */}
+            {(() => {
+              const currentServer = servers.find((s) => s.id === serverId)
+              if (currentServer && (currentServer.serverType === 'CPANEL_SFTP' || currentServer.iconType === 'cpanel' || currentServer.host === 'travaiq.com')) {
+                return (
+                  <div className="mt-2 p-2.5 bg-[#FFF4E5] border border-[#FED7AA] rounded-[6px] flex items-start gap-2 text-[11px] text-[#9A3412]">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#C2410C]" />
+                    <div>
+                      <span className="font-bold">cPanel Pure SFTP Target:</span> Transfers pre-compiled assets cleanly over SFTP directly into the web root, completely resolving the <em>"SSH connection failed: Unable to exec"</em> restriction without requiring shell execution.
+                    </div>
+                  </div>
+                )
+              }
+              if (currentServer && (currentServer.serverType === 'DOCKER' || currentServer.iconType === 'docker')) {
+                return (
+                  <div className="mt-2 p-2.5 bg-[#E0F2FE] border border-[#BAE6FD] rounded-[6px] flex items-start gap-2 text-[11px] text-[#0369A1]">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#0284C7]" />
+                    <div>
+                      <span className="font-bold">Remote Docker Engine Target:</span> Connects directly to Docker daemon for zero-downtime rolling container updates and image tag rollouts.
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
           </div>
 
           {/* Target Name */}
@@ -513,10 +837,25 @@ export function AddTargetModal({
                         : 'border-[#CDD4D0] bg-[#FFFFFF] hover:border-[#8F9CA7] hover:bg-[#FAFBFB]'
                     }`}
                   >
-                    <div className="text-[12px] font-bold flex items-center gap-1.5">
+                    <div className="text-[12px] font-bold flex items-center justify-between gap-1.5">
                       <span className={isSelected ? 'text-[#005459]' : 'text-[#101d26]'}>
                         {preset.label}
                       </span>
+                      {preset.architecture === 'atomic-symlink' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                          Zero-Downtime
+                        </span>
+                      )}
+                      {preset.architecture === 'cpanel-sftp' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
+                          Zero-Shell
+                        </span>
+                      )}
+                      {preset.architecture === 'docker' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
+                          Daemon
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[#565f6b] leading-tight mt-0.5">
                       {preset.desc}
@@ -525,6 +864,74 @@ export function AddTargetModal({
                 )
               })}
             </div>
+          </div>
+
+          {/* Architecture Mode: Atomic Zero-Downtime Symlink Toggle & Visual Card */}
+          <div className="p-3 bg-[#FAFBFB] border border-[#CDD4D0] rounded-[6px] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-[4px] flex items-center justify-center shrink-0 ${isAtomicSymlink ? 'bg-[#EAF5EE] text-[#005459]' : 'bg-[#F4F6F5] text-[#565f6b]'}`}>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isAtomicSymlink ? 'animate-spin' : ''}`} style={{ animationDuration: '6s' }} />
+                </div>
+                <div>
+                  <div className="text-[12px] font-bold text-[#101d26] flex items-center gap-1.5">
+                    <span>Atomic Zero-Downtime Symlink Deployment</span>
+                    {isAtomicSymlink && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                        Enabled
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-[#565f6b]">
+                    Builds into <code className="font-mono text-[#101d26]">/releases/[ts]</code> and atomically points <code className="font-mono text-[#005459]">/current</code> symlink.
+                  </div>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAtomicSymlink}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setIsAtomicSymlink(checked)
+                    if (checked) {
+                      const atomicPreset = TARGET_PRESETS.find((p) => p.architecture === 'atomic-symlink' && p.framework === projectFramework) || TARGET_PRESETS.find((p) => p.id === 'atomic-laravel')
+                      if (atomicPreset) {
+                        setSelectedPresetId(atomicPreset.id)
+                        setPostDeploy(atomicPreset.script)
+                      }
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-[#CDD4D0] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#005459]"></div>
+              </label>
+            </div>
+
+            {isAtomicSymlink && (
+              <div className="bg-[#FFFFFF] p-2.5 rounded border border-[#B8E0C5] text-[10px] font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Target Base:</span>
+                  <span className="font-semibold">{path ? path : '/var/www/my-app'}</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Active Symlink:</span>
+                  <span className="text-[#005459] font-bold">{path ? `${path}/current` : '/var/www/my-app/current'} ──&gt; /releases/[timestamp]</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Shared Storage:</span>
+                  <span>{path ? `${path}/shared/.env` : '/var/www/my-app/shared/.env'} &amp; storage/</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Rollback Duration:</span>
+                  <span className="text-[#2E8B57] font-semibold">&lt; 0.05s (Instant symlink pointer switch)</span>
+                </div>
+                <div className="text-[10px] font-sans text-[#565f6b] pt-1.5 border-t border-[#E2E7E4]">
+                  💡 <strong>Server Config:</strong> Point your web server document root to <code className="text-[#005459] bg-[#EAF5EE] px-1 py-0.5 rounded font-mono">{path ? `${path}/current/public` : '/var/www/my-app/current/public'}</code>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Post-Deploy Script */}

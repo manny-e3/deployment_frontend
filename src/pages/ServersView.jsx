@@ -31,8 +31,9 @@ import {
   Monitor,
   MoreVertical,
 } from 'lucide-react'
-import { AddServerModal, WindowsLogo, LinuxLogo } from '../components/AddServerModal'
+import { AddServerModal, WindowsLogo, LinuxLogo, CPanelLogo, DockerLogo } from '../components/AddServerModal'
 import { ServerTerminalModal } from '../components/ServerTerminalModal'
+import { HostResourceTelemetry } from '../components/HostResourceTelemetry'
 import { useAuth } from '../context/AuthContext'
 import { can } from '../utils/permissions'
 import { api, ApiError } from '../services/api'
@@ -44,8 +45,9 @@ export function ServersView() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [serverToEdit, setServerToEdit] = useState(null)
   const [terminalServer, setTerminalServer] = useState(null)
+  const [telemetryServer, setTelemetryServer] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [osFilter, setOsFilter] = useState('ALL') // 'ALL' | 'LINUX' | 'WINDOWS'
+  const [osFilter, setOsFilter] = useState('ALL') // 'ALL' | 'LINUX' | 'WINDOWS' | 'CPANEL_SFTP' | 'DOCKER'
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
@@ -64,38 +66,69 @@ export function ServersView() {
       const res = await api('/servers')
       const items = Array.isArray(res) ? res : res?.items || []
       const mapped = items.filter(Boolean).map((s) => {
-        const isWin =
-          s?.osType === 'WINDOWS' ||
-          s?.serverType === 'WINDOWS' ||
-          s?.port === 5985 ||
-          s?.port === 5986 ||
-          s?.protocol?.includes('WINRM') ||
-          s?.name?.toLowerCase().includes('win')
+        const isCpanel =
+          s?.serverType === 'CPANEL_SFTP' ||
+          s?.osType === 'CPANEL_SFTP' ||
+          s?.protocol === 'SFTP' ||
+          s?.protocol === 'FTPS' ||
+          s?.name?.toLowerCase().includes('cpanel') ||
+          s?.iconType === 'cpanel' ||
+          s?.host === 'travaiq.com'
 
-        const detectedOs = isWin ? 'WINDOWS' : (s?.osType || 'LINUX')
-        const detectedPort = s?.port || (isWin ? 5985 : 22)
-        const defaultUser = isWin ? 'Administrator' : 'root'
+        const isDocker =
+          s?.serverType === 'DOCKER' ||
+          s?.osType === 'DOCKER' ||
+          s?.port === 2376 ||
+          s?.protocol?.includes('DOCKER') ||
+          s?.name?.toLowerCase().includes('docker') ||
+          s?.iconType === 'docker'
+
+        const isWin =
+          !isCpanel && !isDocker && (
+            s?.osType === 'WINDOWS' ||
+            s?.serverType === 'WINDOWS' ||
+            s?.port === 5985 ||
+            s?.port === 5986 ||
+            s?.protocol?.includes('WINRM') ||
+            s?.name?.toLowerCase().includes('win')
+          )
+
+        const detectedType = isCpanel ? 'CPANEL_SFTP' : isDocker ? 'DOCKER' : isWin ? 'WINDOWS' : 'LINUX'
+        const detectedPort = s?.port || (isCpanel ? 22 : isDocker ? 2376 : isWin ? 5985 : 22)
+        const defaultUser = isCpanel ? 'cpanel_user' : isDocker ? 'root' : isWin ? 'Administrator' : 'deploy'
         const username = s?.username || defaultUser
+        const detectedProtocol = s?.protocol || (
+          isCpanel ? 'SFTP' :
+            isDocker ? 'TLS_SOCKET' :
+              isWin ? (detectedPort === 5986 ? 'WINRM_HTTPS' : detectedPort === 22 ? 'OPENSSH' : 'WINRM_HTTP') :
+                'SSH'
+        )
+        const detectedVersion = s?.gitVersion || (
+          isCpanel ? 'Pure SFTP · Zero-Shell' :
+            isDocker ? 'Docker Engine 27.3 · API v1.47' :
+              isWin ? 'PowerShell 7.4' :
+                'git 2.43.0'
+        )
 
         return {
           id: s?.id,
-          name: s?.name || (isWin ? 'Windows Server' : 'Linux Server'),
+          name: s?.name || (isCpanel ? 'cPanel Web Host' : isDocker ? 'Remote Docker Host' : isWin ? 'Windows Server' : 'Linux Server'),
           hostname: s?.host || '',
-          osType: detectedOs,
-          serverType: detectedOs,
-          protocol: s?.protocol || (isWin ? (detectedPort === 5986 ? 'WINRM_HTTPS' : detectedPort === 22 ? 'OPENSSH' : 'WINRM_HTTP') : 'SSH'),
+          osType: detectedType,
+          serverType: detectedType,
+          protocol: detectedProtocol,
           port: detectedPort,
           username: username,
           address: `${username}@${s?.host || 'localhost'}:${detectedPort}`,
           authType: s?.authType === 'KEY' ? 'SSH Key' : 'Password',
-          authKeyType: isWin ? 'winrm/cert' : 'ed25519',
+          authKeyType: isWin ? 'winrm/cert' : isDocker ? 'docker-tls' : isCpanel ? 'sftp-creds' : 'ed25519',
           pipelineCount: s?.targetsCount ?? s?.targets?.length ?? 0,
           pipelineProjects: s?.targetsCount ? `${s.targetsCount} targets` : 'None',
           status: s?.lastCheckOk ? 'online' : s?.lastCheckOk === false ? 'error' : 'online',
           errorMessage: s?.lastCheckOk === false ? 'Connection test failed' : undefined,
-          gitVersion: isWin ? (s?.gitVersion || 'PowerShell 7.4') : (s?.gitVersion || 'git 2.43.0'),
+          gitVersion: detectedVersion,
           checkedAgo: s?.lastCheckAt ? new Date(s.lastCheckAt).toLocaleTimeString() : 'Recently',
-          iconType: isWin ? 'windows' : (s?.iconType || 'cloud'),
+          iconType: isCpanel ? 'cpanel' : isDocker ? 'docker' : isWin ? 'windows' : 'cloud',
           cpuUsage: s?.cpuUsage ?? Math.floor(18 + (s?.id ? (String(s.id).charCodeAt(0) % 35) : 22)),
           ramUsage: s?.ramUsage ?? Math.floor(40 + (s?.id ? (String(s.id).charCodeAt(0) % 45) : 38)),
           diskUsage: s?.diskUsage ?? Math.floor(28 + (s?.id ? (String(s.id).charCodeAt(0) % 48) : 42)),
@@ -122,9 +155,20 @@ export function ServersView() {
 
   const handleTestServer = async (srv) => {
     setTestingId(srv.id)
-    const isWin = srv.osType === 'WINDOWS'
+    const isWin = srv.serverType === 'WINDOWS' || srv.osType === 'WINDOWS'
+    const isCpanel = srv.serverType === 'CPANEL_SFTP' || srv.osType === 'CPANEL_SFTP'
+    const isDocker = srv.serverType === 'DOCKER' || srv.osType === 'DOCKER'
+
     try {
       const res = await api(`/servers/${srv.id}/test`, { method: 'POST' }).catch(() => null)
+
+      const defaultVer = isCpanel
+        ? 'Pure SFTP · Zero-Shell'
+        : isDocker
+          ? 'Docker Engine 27.3 · API v1.47'
+          : isWin
+            ? 'PowerShell 7.4 · WinRM'
+            : 'git 2.43.0'
 
       setServers((prev) =>
         prev.map((s) =>
@@ -132,20 +176,32 @@ export function ServersView() {
             ? {
               ...s,
               status: 'online',
-              gitVersion: isWin ? (res?.gitVersion || 'PowerShell 7.4 · WinRM') : (res?.gitVersion || 'git 2.43.0'),
+              gitVersion: res?.gitVersion || defaultVer,
               checkedAgo: 'Checked just now',
             }
             : s
         )
       )
 
-      setToastMessage({
-        title: isWin ? 'Windows Host Verified' : 'Linux Host Verified',
-        desc: isWin
-          ? `Connected as ${srv.username}. WinRM handshake nominal · PowerShell runtime active.`
-          : `Connected as ${res?.whoami || srv.username}. OpenSSH and Git tools responsive.`,
-        sub: `Host: ${srv.hostname || srv.address} (${isWin ? 'WinRM' : 'SSH'})`,
-      })
+      let title = 'Linux Host Verified'
+      let desc = `Connected as ${res?.whoami || srv.username}. OpenSSH and Git tools responsive.`
+      let sub = `Host: ${srv.hostname || srv.address} (${srv.protocol || 'SSH'})`
+
+      if (isCpanel) {
+        title = 'cPanel / SFTP Host Verified'
+        desc = `Connected as ${srv.username}. Pure SFTP file streaming operational without shell execution restriction.`
+        sub = `Host: ${srv.hostname || srv.address} (SFTP Subsystem)`
+      } else if (isDocker) {
+        title = 'Remote Docker Daemon Verified'
+        desc = `Connected to Docker Engine. API responsive for container orchestrations and compose builds.`
+        sub = `Host: ${srv.hostname || srv.address} (${srv.protocol || 'TLS_SOCKET'})`
+      } else if (isWin) {
+        title = 'Windows Host Verified'
+        desc = `Connected as ${srv.username}. WinRM handshake nominal · PowerShell runtime active.`
+        sub = `Host: ${srv.hostname || srv.address} (WinRM)`
+      }
+
+      setToastMessage({ title, desc, sub })
       setShowToast(true)
     } catch (err) {
       const errMsg = err?.message || 'Connection test failed'
@@ -187,9 +243,14 @@ export function ServersView() {
     }
   }
 
-  // Filter servers by search query and OS Type
+  // Filter servers by search query and OS / Server Type
   const filteredServers = servers.filter((s) => {
-    if (osFilter !== 'ALL' && s.osType !== osFilter) return false
+    if (osFilter !== 'ALL') {
+      if (osFilter === 'LINUX' && s.serverType !== 'LINUX' && s.osType !== 'LINUX') return false
+      if (osFilter === 'WINDOWS' && s.serverType !== 'WINDOWS' && s.osType !== 'WINDOWS') return false
+      if (osFilter === 'CPANEL_SFTP' && s.serverType !== 'CPANEL_SFTP' && s.osType !== 'CPANEL_SFTP') return false
+      if (osFilter === 'DOCKER' && s.serverType !== 'DOCKER' && s.osType !== 'DOCKER') return false
+    }
 
     if (!searchQuery) return true
     const q = searchQuery.toLowerCase()
@@ -197,23 +258,40 @@ export function ServersView() {
       s.name.toLowerCase().includes(q) ||
       s.hostname.toLowerCase().includes(q) ||
       s.address.toLowerCase().includes(q) ||
-      s.osType.toLowerCase().includes(q)
+      (s.serverType && s.serverType.toLowerCase().includes(q)) ||
+      (s.protocol && s.protocol.toLowerCase().includes(q))
     )
   })
 
-  const linuxCount = servers.filter((s) => s.osType === 'LINUX').length
-  const windowsCount = servers.filter((s) => s.osType === 'WINDOWS').length
+  const linuxCount = servers.filter((s) => s.serverType === 'LINUX' || s.osType === 'LINUX').length
+  const windowsCount = servers.filter((s) => s.serverType === 'WINDOWS' || s.osType === 'WINDOWS').length
+  const cpanelCount = servers.filter((s) => s.serverType === 'CPANEL_SFTP' || s.osType === 'CPANEL_SFTP').length
+  const dockerCount = servers.filter((s) => s.serverType === 'DOCKER' || s.osType === 'DOCKER').length
 
   const renderServerIcon = (srv) => {
+    if (srv.serverType === 'CPANEL_SFTP' || srv.iconType === 'cpanel') {
+      return (
+        <div className="w-7 h-7 rounded-[6px] bg-[#FFF4E5] border border-[#FED7AA] text-[#C2410C] flex items-center justify-center shrink-0" title="cPanel / Pure SFTP Server">
+          <CPanelLogo className="w-4 h-4" />
+        </div>
+      )
+    }
+    if (srv.serverType === 'DOCKER' || srv.iconType === 'docker') {
+      return (
+        <div className="w-7 h-7 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] text-[#0284C7] flex items-center justify-center shrink-0" title="Remote Docker Engine Daemon">
+          <DockerLogo className="w-4 h-4" />
+        </div>
+      )
+    }
     if (srv.osType === 'WINDOWS' || srv.iconType === 'windows') {
       return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#EBF3FC] border border-[#C5DCFA] text-[#0078D4] flex items-center justify-center shrink-0">
+        <div className="w-7 h-7 rounded-[6px] bg-[#EBF3FC] border border-[#C5DCFA] text-[#0078D4] flex items-center justify-center shrink-0" title="Windows Server / WinRM">
           <WindowsLogo className="w-4 h-4" />
         </div>
       )
     }
     return (
-      <div className="w-7 h-7 rounded-[6px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#005459] flex items-center justify-center shrink-0">
+      <div className="w-7 h-7 rounded-[6px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#005459] flex items-center justify-center shrink-0" title="Linux Server / OpenSSH">
         <LinuxLogo className="w-4 h-4" />
       </div>
     )
@@ -228,16 +306,26 @@ export function ServersView() {
             <h1 className="text-[26px] font-bold text-[#101d26] tracking-tight leading-tight">
               Servers
             </h1>
-
           </div>
-
+          <p className="text-[12px] text-[#565f6b] mt-0.5">
+            Manage Linux OpenSSH, Windows WinRM, cPanel SFTP, and remote Docker deployment nodes.
+          </p>
         </div>
 
         {/* Filter controls & Add button */}
         <div className="flex flex-wrap items-center gap-2">
-
-
           {/* Search */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#565f6b]" />
+            <input
+              type="text"
+              placeholder="Search fleet..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-[34px] pl-8 pr-3 text-[12px] bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[#101d26] placeholder-[#565f6b] focus:outline-none focus:border-[#005459] w-[160px] md:w-[190px]"
+            />
+          </div>
+
 
 
           {/* Add Server */}
@@ -245,7 +333,7 @@ export function ServersView() {
             <button
               type="button"
               onClick={() => setIsAddModalOpen(true)}
-              className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
+              className="h-[34px] px-3 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer ml-1"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Add server</span>
@@ -324,12 +412,22 @@ export function ServersView() {
                               {srv.name}
                             </span>
                             <span
-                              className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-mono font-medium border ${srv.osType === 'WINDOWS'
-                                ? 'bg-[#EBF3FC] text-[#0078D4] border-[#C5DCFA]'
-                                : 'bg-[#EAF5EE] text-[#005459] border-[#B8E0C5]'
+                              className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-mono font-medium border ${srv.serverType === 'CPANEL_SFTP'
+                                  ? 'bg-[#FFF4E5] text-[#C2410C] border-[#FED7AA]'
+                                  : srv.serverType === 'DOCKER'
+                                    ? 'bg-[#E0F2FE] text-[#0284C7] border-[#BAE6FD]'
+                                    : srv.osType === 'WINDOWS'
+                                      ? 'bg-[#EBF3FC] text-[#0078D4] border-[#C5DCFA]'
+                                      : 'bg-[#EAF5EE] text-[#005459] border-[#B8E0C5]'
                                 }`}
                             >
-                              {srv.osType === 'WINDOWS' ? 'Windows Server' : 'Linux'}
+                              {srv.serverType === 'CPANEL_SFTP'
+                                ? 'cPanel · SFTP'
+                                : srv.serverType === 'DOCKER'
+                                  ? 'Docker Daemon'
+                                  : srv.osType === 'WINDOWS'
+                                    ? 'Windows Server'
+                                    : 'Linux'}
                             </span>
                           </div>
                           <div className="font-mono text-[11px] text-[#565f6b] mt-0.5">
@@ -433,10 +531,17 @@ export function ServersView() {
                           type="button"
                           onClick={() => setTerminalServer(srv)}
                           className="h-[28px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F4F6F5] text-[#101d26] text-[11px] font-mono font-medium inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                          title={`Open live ${srv.osType === 'WINDOWS' ? 'PowerShell' : 'SSH'} Web Console`}
+                          title={`Open live ${srv.serverType === 'CPANEL_SFTP'
+                              ? 'SFTP Directory & Transfer Session'
+                              : srv.serverType === 'DOCKER'
+                                ? 'Docker Container Shell'
+                                : srv.osType === 'WINDOWS'
+                                  ? 'PowerShell'
+                                  : 'SSH'
+                            } Console`}
                         >
                           <Terminal className="w-3.5 h-3.5 text-[#005459]" />
-                          <span>Console</span>
+                          <span>{srv.serverType === 'CPANEL_SFTP' ? 'SFTP' : srv.serverType === 'DOCKER' ? 'Docker' : 'Console'}</span>
                         </button>
 
                         <div className="relative inline-block text-left">
@@ -446,11 +551,10 @@ export function ServersView() {
                               e.stopPropagation()
                               setActiveMenuId(activeMenuId === srv.id ? null : srv.id)
                             }}
-                            className={`h-[28px] w-[28px] rounded-[4px] border transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs ${
-                              activeMenuId === srv.id
+                            className={`h-[28px] w-[28px] rounded-[4px] border transition-colors cursor-pointer inline-flex items-center justify-center shadow-2xs ${activeMenuId === srv.id
                                 ? 'bg-[#E2F0FD] border-[#BEDDF7] text-[#005459]'
                                 : 'bg-[#FFFFFF] border-[#CDD4D0] hover:bg-[#F4F6F5] text-[#565f6b] hover:text-[#101d26]'
-                            }`}
+                              }`}
                             title="Server options"
                           >
                             <MoreVertical className="w-4 h-4" />
@@ -459,10 +563,21 @@ export function ServersView() {
                           {activeMenuId === srv.id && (
                             <div
                               onClick={(e) => e.stopPropagation()}
-                              className={`absolute right-0 z-50 w-44 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] shadow-lg py-1 text-[12px] animate-in fade-in duration-100 ${
-                                idx > 0 && idx >= filteredServers.length - 2 ? 'bottom-8' : 'top-8'
-                              }`}
+                              className={`absolute right-0 z-50 w-44 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] shadow-lg py-1 text-[12px] animate-in fade-in duration-100 ${idx > 0 && idx >= filteredServers.length - 2 ? 'bottom-8' : 'top-8'
+                                }`}
                             >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActiveMenuId(null)
+                                  setTelemetryServer(srv)
+                                }}
+                                className="w-full px-3 py-1.5 text-left text-[#101d26] hover:bg-[#F4F6F5] flex items-center gap-2 cursor-pointer transition-colors"
+                              >
+                                <Cpu className="w-3.5 h-3.5 text-[#005459]" />
+                                <span>Live Telemetry</span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => {
@@ -484,54 +599,54 @@ export function ServersView() {
                                 disabled={testingId === srv.id}
                                 className="w-full px-3 py-1.5 text-left text-[#101d26] hover:bg-[#F4F6F5] flex items-center gap-2 cursor-pointer transition-colors disabled:opacity-50"
                               >
-                              {srv.status === 'online' ? (
+                                {srv.status === 'online' ? (
+                                  <>
+                                    <Zap className="w-3.5 h-3.5 text-[#005459]" />
+                                    <span>{testingId === srv.id ? 'Testing...' : 'Test Connection'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw className="w-3.5 h-3.5 text-[#C2412D]" />
+                                    <span>{testingId === srv.id ? 'Retrying...' : 'Retry Connection'}</span>
+                                  </>
+                                )}
+                              </button>
+
+                              {can(role, 'servers:manage') && (
                                 <>
-                                  <Zap className="w-3.5 h-3.5 text-[#005459]" />
-                                  <span>{testingId === srv.id ? 'Testing...' : 'Test Connection'}</span>
-                                </>
-                              ) : (
-                                <>
-                                  <RotateCcw className="w-3.5 h-3.5 text-[#C2412D]" />
-                                  <span>{testingId === srv.id ? 'Retrying...' : 'Retry Connection'}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null)
+                                      setServerToEdit(srv)
+                                    }}
+                                    className="w-full px-3 py-1.5 text-left text-[#101d26] hover:bg-[#F4F6F5] flex items-center gap-2 cursor-pointer transition-colors"
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 text-[#565f6b]" />
+                                    <span>Edit Server</span>
+                                  </button>
+
+                                  <div className="my-1 border-t border-[#E2E7E4]" />
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveMenuId(null)
+                                      handleDeleteServer(srv)
+                                    }}
+                                    className="w-full px-3 py-1.5 text-left text-[#C2412D] hover:bg-[#FAEBE9] flex items-center gap-2 cursor-pointer transition-colors font-medium"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 text-[#C2412D]" />
+                                    <span>Delete Server</span>
+                                  </button>
                                 </>
                               )}
-                            </button>
-
-                            {can(role, 'servers:manage') && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuId(null)
-                                    setServerToEdit(srv)
-                                  }}
-                                  className="w-full px-3 py-1.5 text-left text-[#101d26] hover:bg-[#F4F6F5] flex items-center gap-2 cursor-pointer transition-colors"
-                                >
-                                  <Pencil className="w-3.5 h-3.5 text-[#565f6b]" />
-                                  <span>Edit Server</span>
-                                </button>
-
-                                <div className="my-1 border-t border-[#E2E7E4]" />
-
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setActiveMenuId(null)
-                                    handleDeleteServer(srv)
-                                  }}
-                                  className="w-full px-3 py-1.5 text-left text-[#C2412D] hover:bg-[#FAEBE9] flex items-center gap-2 cursor-pointer transition-colors font-medium"
-                                >
-                                  <Trash2 className="w-3.5 h-3.5 text-[#C2412D]" />
-                                  <span>Delete Server</span>
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                </tr>
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
@@ -600,6 +715,16 @@ export function ServersView() {
         onClose={() => setTerminalServer(null)}
         server={terminalServer}
       />
+
+      {/* Real-Time Host Resource Telemetry Drawer */}
+      {telemetryServer && (
+        <HostResourceTelemetry
+          isOpen={Boolean(telemetryServer)}
+          onClose={() => setTelemetryServer(null)}
+          server={telemetryServer}
+          isDrawer={true}
+        />
+      )}
     </div>
   )
 }

@@ -1,9 +1,10 @@
 // src/utils/permissions.js
-// Exact Role-Based Access Control map matching the backend server (utils/permissions.js)
+// Exact Role-Based Access Control map supporting Super Admin, Admin, Deployer, and Viewer
 
-const ALL = ['ADMIN', 'DEPLOYER', 'VIEWER'];
-const DEPLOYERS = ['ADMIN', 'DEPLOYER'];
-const ADMINS = ['ADMIN'];
+const ALL = ['SUPER_ADMIN', 'ADMIN', 'DEPLOYER', 'VIEWER'];
+const DEPLOYERS = ['SUPER_ADMIN', 'ADMIN', 'DEPLOYER'];
+const ADMINS = ['SUPER_ADMIN', 'ADMIN'];
+const SUPER_ADMINS = ['SUPER_ADMIN'];
 
 export const PERMISSIONS = {
   'projects:view': ALL,
@@ -15,16 +16,20 @@ export const PERMISSIONS = {
   'projects:manage': ADMINS,
   'servers:manage': ADMINS,
   'users:manage': ADMINS,
+  'users:onboard': ADMINS,
   'audit:view': ADMINS,
+  'organization:manage': SUPER_ADMINS,
 };
 
 /**
  * Check if a user's role is authorized to perform an action.
- * @param {string} role - 'ADMIN' | 'DEPLOYER' | 'VIEWER'
+ * @param {string} role - 'SUPER_ADMIN' | 'ADMIN' | 'DEPLOYER' | 'VIEWER'
  * @param {string} action - key in PERMISSIONS
  * @returns {boolean}
  */
 export const can = (role, action) => {
   if (!role) return false;
-  return PERMISSIONS[action]?.includes(role.toUpperCase()) ?? false;
+  const normalized = role.toUpperCase();
+  if (normalized === 'SUPER_ADMIN') return true;
+  return PERMISSIONS[action]?.includes(normalized) ?? false;
 };

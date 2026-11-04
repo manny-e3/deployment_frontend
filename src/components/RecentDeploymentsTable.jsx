@@ -29,6 +29,8 @@ export function RecentDeploymentsTable({
   onViewAll,
   activeFilter = 'ALL',
   onFilterChange,
+  limit = null,
+  compact = false,
 }) {
   const [internalFilter, setInternalFilter] = useState('ALL')
   const [copiedSha, setCopiedSha] = useState(null)
@@ -169,6 +171,9 @@ export function RecentDeploymentsTable({
     )
   }
 
+  // Slice if limit is provided
+  const displayedList = limit ? filteredList.slice(0, limit) : filteredList
+
   return (
     <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[10px] overflow-hidden shadow-2xs">
       {/* Top Header & Filter Navigation Bar */}
@@ -259,30 +264,40 @@ export function RecentDeploymentsTable({
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse select-none">
           <thead>
-            <tr className="h-[36px] bg-[#F4F6F5] border-b border-[#CDD4D0] text-[#565f6b] font-semibold text-[11px] font-mono tracking-wider uppercase">
-              <th className="px-4 w-[110px]">STATUS</th>
-              <th className="px-3">PROJECT</th>
-              <th className="px-3">TARGET</th>
-              <th className="px-3">BRANCH</th>
-              <th className="px-3">COMMIT</th>
-              <th className="px-3">TRIGGER</th>
-              <th className="px-3">WHEN</th>
-              <th className="px-4 text-right w-[90px]">ACTION</th>
-            </tr>
+            {compact ? (
+              <tr className="h-[36px] bg-[#F4F6F5] border-b border-[#CDD4D0] text-[#565f6b] font-semibold text-[11px] font-mono tracking-wider uppercase">
+                <th className="px-3.5 w-[95px]">STATUS</th>
+                <th className="px-3">SERVICE &amp; TARGET</th>
+                <th className="px-3">COMMIT</th>
+                <th className="px-3 w-[105px]">WHEN</th>
+                <th className="px-3.5 text-right w-[85px]">ACTION</th>
+              </tr>
+            ) : (
+              <tr className="h-[36px] bg-[#F4F6F5] border-b border-[#CDD4D0] text-[#565f6b] font-semibold text-[11px] font-mono tracking-wider uppercase">
+                <th className="px-4 w-[110px]">STATUS</th>
+                <th className="px-3">PROJECT</th>
+                <th className="px-3">TARGET</th>
+                <th className="px-3">BRANCH</th>
+                <th className="px-3">COMMIT</th>
+                <th className="px-3">TRIGGER</th>
+                <th className="px-3">WHEN</th>
+                <th className="px-4 text-right w-[90px]">ACTION</th>
+              </tr>
+            )}
           </thead>
           <tbody className="divide-y divide-[#E2E7E4] text-[13px]">
             {loading ? (
               <tr>
-                <td colSpan={8} className="py-14 text-center text-[#565f6b]">
+                <td colSpan={compact ? 5 : 8} className="py-14 text-center text-[#565f6b]">
                   <div className="flex flex-col items-center justify-center gap-2">
                     <Loader2 className="w-5 h-5 animate-spin text-[#005459]" />
                     <span className="text-[13px] font-mono">Streaming deployment records...</span>
                   </div>
                 </td>
               </tr>
-            ) : filteredList.length === 0 ? (
+            ) : displayedList.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center">
+                <td colSpan={compact ? 5 : 8} className="py-12 text-center">
                   <div className="max-w-sm mx-auto flex flex-col items-center gap-2.5 text-[#565f6b]">
                     <div className="w-10 h-10 rounded-full bg-[#F4F6F5] flex items-center justify-center">
                       <Rocket className="w-5 h-5 text-[#8F9CA7] stroke-[1.5]" />
@@ -310,10 +325,95 @@ export function RecentDeploymentsTable({
                 </td>
               </tr>
             ) : (
-              filteredList.map((d) => {
+              displayedList.map((d) => {
                 const timeAgo = formatTimeAgo(d.queuedAt || d.startedAt)
                 const duration = formatDuration(d.startedAt, d.finishedAt)
 
+                if (compact) {
+                  return (
+                    <tr
+                      key={d.id}
+                      onClick={() => onSelectDeployment && onSelectDeployment(d)}
+                      className="group h-[52px] hover:bg-[#F8FAF9] transition-colors cursor-pointer"
+                    >
+                      {/* Compact Status Badge */}
+                      <td className="px-3.5 whitespace-nowrap">
+                        {renderStatusBadge(d.status || d.rawStatus)}
+                      </td>
+
+                      {/* Project + Target combined cleanly (No wrapping!) */}
+                      <td className="px-3 py-2">
+                        <div className="flex flex-col min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-[#101d26] group-hover:text-[#005459] transition-colors truncate">
+                              {d.project}
+                            </span>
+                            {d.branch && (
+                              <span className="px-1.5 py-0.2 rounded bg-[#F4F6F5] text-[#565f6b] text-[10px] font-mono border border-[#CDD4D0] shrink-0">
+                                {d.branch}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-[11px] text-[#565f6b] font-mono truncate mt-0.5">
+                            <Server className="w-2.5 h-2.5 text-[#8F9CA7] shrink-0" />
+                            <span className="truncate">{d.server || d.targetName || 'Default'}</span>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Commit SHA + Msg */}
+                      <td className="px-3 py-2">
+                        <div className="flex items-center gap-1.5 max-w-[220px]">
+                          <button
+                            type="button"
+                            onClick={(e) => handleCopySha(e, d.commitSha)}
+                            title="Click to copy SHA"
+                            className="px-1.5 py-0.5 rounded bg-[#E2F0FD] hover:bg-[#D0E7FC] text-[#005459] font-mono text-[10px] font-bold border border-[#BEDAF2] flex items-center gap-1 shrink-0 cursor-pointer"
+                          >
+                            {copiedSha === d.commitSha ? (
+                              <Check className="w-2.5 h-2.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-2.5 h-2.5 text-[#005459]/70" />
+                            )}
+                            <span>{d.commitSha}</span>
+                          </button>
+                          <span
+                            className="text-[12px] text-[#565f6b] truncate"
+                            title={d.commitMsg}
+                          >
+                            {d.commitMsg}
+                          </span>
+                        </div>
+                      </td>
+
+                      {/* When */}
+                      <td className="px-3 whitespace-nowrap text-[12px] text-[#565f6b]">
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#8F9CA7] shrink-0" />
+                          <span>{timeAgo}</span>
+                        </div>
+                      </td>
+
+                      {/* Action */}
+                      <td className="px-3.5 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onSelectDeployment && onSelectDeployment(d)
+                          }}
+                          className="px-2 py-1 rounded-[4px] bg-white border border-[#CDD4D0] hover:bg-[#005459] hover:text-white hover:border-[#005459] text-[#565f6b] text-[11px] font-medium inline-flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                          title="View deployment logs"
+                        >
+                          <Terminal className="w-3 h-3" />
+                          <span>Logs</span>
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                }
+
+                // Standard Full Row (e.g. on DeploymentsView)
                 return (
                   <tr
                     key={d.id}
@@ -321,12 +421,12 @@ export function RecentDeploymentsTable({
                     className="group h-[44px] hover:bg-[#F8FAF9] transition-colors cursor-pointer"
                   >
                     {/* Status Badge */}
-                    <td className="px-4">
+                    <td className="px-4 whitespace-nowrap">
                       {renderStatusBadge(d.status || d.rawStatus)}
                     </td>
 
                     {/* Project & Environment Pill */}
-                    <td className="px-3">
+                    <td className="px-3 whitespace-nowrap">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-[#101d26] group-hover:text-[#005459] transition-colors tracking-tight">
                           {d.project}
@@ -340,7 +440,7 @@ export function RecentDeploymentsTable({
                     </td>
 
                     {/* Target / Server */}
-                    <td className="px-3 font-mono text-[12px] text-[#565f6b]">
+                    <td className="px-3 font-mono text-[12px] text-[#565f6b] whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         <Server className="w-3 h-3 text-[#8F9CA7]" />
                         <span>{d.server}</span>
@@ -348,7 +448,7 @@ export function RecentDeploymentsTable({
                     </td>
 
                     {/* Branch */}
-                    <td className="px-3">
+                    <td className="px-3 whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-[4px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#005459] font-mono text-[11px] font-medium">
                         <GitBranch className="w-2.5 h-2.5 text-[#005459]" />
                         <span>{d.branch}</span>
@@ -381,7 +481,7 @@ export function RecentDeploymentsTable({
                     </td>
 
                     {/* Triggered By */}
-                    <td className="px-3">
+                    <td className="px-3 whitespace-nowrap">
                       {renderTriggeredBy(d)}
                     </td>
 
@@ -399,7 +499,7 @@ export function RecentDeploymentsTable({
                     </td>
 
                     {/* Action button */}
-                    <td className="px-4 text-right">
+                    <td className="px-4 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -460,6 +560,26 @@ export function RecentDeploymentsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Pagination / Limit Footer */}
+      {limit && filteredList.length > limit && (
+        <div className="px-4 py-2.5 border-t border-[#E2E7E4] bg-[#FAFBFB] flex items-center justify-between text-[12px] text-[#565f6b]">
+          <span>
+            Showing <strong className="text-[#101d26]">{displayedList.length}</strong> of{' '}
+            <strong className="text-[#101d26]">{filteredList.length}</strong> deployments
+          </span>
+          {onViewAll && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              className="font-semibold text-[#005459] hover:text-[#0B5459] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>View full history ({deployments.length})</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Server, Loader2, ArrowRight, Shield, Terminal, Copy, Check, Cpu, HardDrive, Wifi } from 'lucide-react'
 import { WindowsLogo } from './AddServerModal'
 
-export function ServersListCard({ servers = [], loading = false, onManageServers, onAddServer }) {
+export function ServersListCard({ servers = [], loading = false, onManageServers, onAddServer, compact = false }) {
   const [copiedId, setCopiedId] = useState(null)
 
   const handleCopyHost = (e, srv) => {
@@ -18,10 +18,12 @@ export function ServersListCard({ servers = [], loading = false, onManageServers
     (s) => s.lastCheckOk !== false && s.status !== 'offline'
   ).length
 
+  const displayServers = compact ? servers.slice(0, 4) : servers.slice(0, 5)
+
   return (
     <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[10px] overflow-hidden shadow-2xs">
       {/* Card Header */}
-      <div className="px-4.5 py-3.5 border-b border-[#E2E7E4] flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-[#E2E7E4] flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5">
             <Server className="w-4 h-4 text-[#005459]" />
@@ -76,7 +78,7 @@ export function ServersListCard({ servers = [], loading = false, onManageServers
             )}
           </div>
         ) : (
-          servers.slice(0, 5).map((srv) => {
+          displayServers.map((srv) => {
             const isOnline = srv.lastCheckOk !== false && srv.status !== 'offline'
             const hostDisplay = srv.host || srv.ip || 'localhost'
             const isWin =
@@ -85,6 +87,42 @@ export function ServersListCard({ servers = [], loading = false, onManageServers
               srv.port === 5985 ||
               srv.port === 5986 ||
               srv.name?.toLowerCase().includes('win')
+
+            if (compact) {
+              return (
+                <div
+                  key={srv.id}
+                  className="px-4 py-2.5 hover:bg-[#F8FAF9] transition-colors flex items-center justify-between gap-2"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        isOnline ? 'bg-emerald-500' : 'bg-rose-500'
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <div className="font-semibold text-[13px] text-[#101d26] truncate flex items-center gap-1.5">
+                        {isWin && <WindowsLogo className="w-3.5 h-3.5 text-[#0078D4] shrink-0" />}
+                        <span className="truncate">{srv.name}</span>
+                      </div>
+                      <div className="text-[11px] font-mono text-[#565f6b] truncate">
+                        {hostDisplay} · {isWin ? 'Windows' : 'Linux'}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono shrink-0 font-bold uppercase border ${
+                      isOnline
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                        : 'bg-rose-50 text-rose-700 border-rose-200/80'
+                    }`}
+                  >
+                    {isOnline ? 'ONLINE' : 'OFFLINE'}
+                  </span>
+                </div>
+              )
+            }
 
             return (
               <div

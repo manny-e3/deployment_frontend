@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { DashboardMetrics } from '../components/DashboardMetrics'
+import { DoraMetricsCard } from '../components/DoraMetricsCard'
 import { RecentDeploymentsTable } from '../components/RecentDeploymentsTable'
 import { ServersListCard } from '../components/ServersListCard'
 import { RunningNowCard } from '../components/RunningNowCard'
@@ -23,12 +24,15 @@ import {
   X,
   ExternalLink,
   GitBranch,
+  ChevronRight,
+  UserPlus,
+  Crown
 } from 'lucide-react'
 
 export function DashboardView() {
   const navigate = useNavigate()
   const searchInputRef = useRef(null)
-  const { role } = useAuth()
+  const { role, isSuperAdmin, organizationName } = useAuth()
   const canRollback = can(role, 'deploy:rollback')
 
   const [environment, setEnvironment] = useState('All')
@@ -36,6 +40,7 @@ export function DashboardView() {
   const [statusFilter, setStatusFilter] = useState('ALL')
   const [loading, setLoading] = useState(true)
   const [isLiveSync, setIsLiveSync] = useState(true)
+  const [activeViewTab, setActiveViewTab] = useState('overview') // 'overview' | 'dora'
 
   const [projects, setProjects] = useState([])
   const [servers, setServers] = useState([])
@@ -254,36 +259,36 @@ export function DashboardView() {
 
         {/* Action Controls Bar */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* Live Sync Toggle */}
-          {/* <button
-            type="button"
-            onClick={() => setIsLiveSync(!isLiveSync)}
-            className={`h-[36px] px-3 rounded-[6px] border text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs ${isLiveSync
-                ? 'bg-[#FFFFFF] border-emerald-300 text-emerald-800 hover:bg-emerald-50/50'
-                : 'bg-[#FFFFFF] border-[#CDD4D0] text-[#565f6b] hover:bg-[#F4F6F5]'
+          {/* View Mode Switcher: Overview vs DORA */}
+          <div className="flex items-center bg-[#F4F6F5] p-0.5 rounded-[6px] border border-[#CDD4D0]">
+            <button
+              type="button"
+              onClick={() => setActiveViewTab('overview')}
+              className={`px-3 py-1 rounded-[5px] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeViewTab === 'overview'
+                  ? 'bg-white text-[#005459] shadow-2xs font-semibold'
+                  : 'text-[#565f6b] hover:text-[#101d26]'
               }`}
-            title={isLiveSync ? 'Live sync enabled (15s auto-refresh)' : 'Live sync paused'}
-          >
-            <Radio className={`w-3.5 h-3.5 ${isLiveSync ? 'text-emerald-600 animate-pulse' : 'text-[#8F9CA7]'}`} />
-            <span className="font-mono text-[11px]">
-              {isLiveSync ? 'LIVE' : 'PAUSED'}
-            </span>
-          </button> */}
-
-          {/* Manual Refresh Button */}
-          {/* <button
-            type="button"
-            onClick={() => fetchDashboardData()}
-            disabled={loading}
-            className="h-[36px] px-3 rounded-[6px] bg-[#FFFFFF] border border-[#CDD4D0] hover:bg-[#F4F6F5] text-[#565f6b] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-2xs"
-            title="Refresh dashboard metrics"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#005459]' : ''}`} />
-            <span className="hidden sm:inline">Refresh</span>
-          </button> */}
+            >
+              <Activity className="w-3.5 h-3.5" />
+              <span>Overview</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveViewTab('dora')}
+              className={`px-3 py-1 rounded-[5px] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
+                activeViewTab === 'dora'
+                  ? 'bg-white text-[#005459] shadow-2xs font-semibold'
+                  : 'text-[#565f6b] hover:text-[#101d26]'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              <span>DORA Telemetry</span>
+            </button>
+          </div>
 
           {/* Search Box */}
-          <div className="relative flex items-center w-[200px] sm:w-[240px]">
+          <div className="relative flex items-center w-[180px] sm:w-[220px]">
             <Search className="w-3.5 h-3.5 text-[#565f6b] absolute left-3 pointer-events-none" />
             <input
               ref={searchInputRef}
@@ -308,21 +313,6 @@ export function DashboardView() {
             )}
           </div>
 
-          {/* Environment Filter Dropdown */}
-          {/* <div className="relative">
-            <select
-              value={environment}
-              onChange={(e) => setEnvironment(e.target.value)}
-              className="h-[36px] pl-3 pr-8 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] font-medium text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15 appearance-none cursor-pointer shadow-2xs"
-            >
-              <option value="All">Environment: All</option>
-              <option value="Production">Environment: Production</option>
-              <option value="Staging">Environment: Staging</option>
-              <option value="QA">Environment: QA</option>
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-[#565f6b] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div> */}
-
           {/* Quick Deploy CTA Button */}
           <button
             type="button"
@@ -336,6 +326,46 @@ export function DashboardView() {
         </div>
       </div>
 
+      {/* Super Admin Team Onboarding Quick-Prompt Banner */}
+      {isSuperAdmin && (
+        <div className="p-3.5 bg-gradient-to-r from-[#E2F0FD] to-[#EAF5EE] border border-[#BEDDF7] rounded-[8px] flex flex-wrap items-center justify-between gap-3 text-[#005459]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#005459] text-white flex items-center justify-center shrink-0">
+              <UserPlus className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-[13px] font-semibold text-[#101d26] flex items-center gap-2">
+                <span>Super Admin Hub: Onboard your engineering team</span>
+                <span className="px-1.5 py-0.2 rounded bg-white text-[#005459] text-[10px] font-mono font-bold border border-[#BEDDF7]">
+                  {organizationName}
+                </span>
+              </div>
+              <div className="text-[11px] text-[#565f6b]">
+                Invite colleagues as Deployers, Admins, or Viewers with customized release permissions.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/onboarding')}
+              className="h-[30px] px-3 rounded-[5px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#BEDDF7] text-[12px] font-medium text-[#005459] transition-colors cursor-pointer shadow-2xs"
+            >
+              Launch Wizard
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/users')}
+              className="h-[30px] px-3 rounded-[5px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Onboard Members</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Metric Cards Row */}
       <DashboardMetrics
         metrics={metrics}
@@ -343,14 +373,16 @@ export function DashboardView() {
         onSelectFilter={(filterKey) => setStatusFilter(filterKey)}
       />
 
-      {/* Two-Column Dashboard Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left Column: Recent Deployments Table */}
-        <div className="lg:col-span-8">
+      {/* Conditional View: DORA Analytics vs Clean Overview */}
+      {activeViewTab === 'dora' ? (
+        <div className="space-y-6">
+          <DoraMetricsCard deployments={deployments} />
+
+          {/* Detailed deployments log under DORA */}
           <RecentDeploymentsTable
             deployments={filteredDeployments}
             loading={loading}
-            title="Recent deployments"
+            title="Deployment Velocity History"
             showViewAll={true}
             activeFilter={statusFilter}
             onFilterChange={(f) => setStatusFilter(f)}
@@ -368,72 +400,127 @@ export function DashboardView() {
             onRollback={canRollback ? (d) => setRollbackDeployment(d) : undefined}
           />
         </div>
-
-        {/* Right Column: Fleet Status & Pipeline Runners */}
-        <div className="lg:col-span-4 space-y-4">
-          <ServersListCard
-            servers={servers}
-            loading={loading}
-            onManageServers={() => navigate('/servers')}
-          />
-
-          <RunningNowCard
-            activeDeploy={activeDeploy}
-            onViewLog={(d) => {
-              setSelectedLog({
-                id: d?.id,
-                service: d?.project || 'Project',
-                server: d?.server || 'Target',
-                status: d?.rawStatus || 'RUNNING',
-                commitSha: d?.commitSha,
-              })
-              setIsLogModalOpen(true)
-            }}
-            onQuickDeploy={() => setIsQuickDeployOpen(true)}
-          />
-
-          {/* Quick Service Launchpad */}
-          {projects.length > 0 && (
-            <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[10px] p-4 shadow-2xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold text-[#565f6b] uppercase tracking-wider font-mono">
-                  Quick Launchpad
-                </span>
-                <button
-                  type="button"
-                  onClick={() => navigate('/projects')}
-                  className="text-[11px] font-medium text-[#005459] hover:underline cursor-pointer"
-                >
-                  All projects →
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {projects.slice(0, 4).map((p) => (
-                  <button
-                    key={p.id}
-                    type="button"
-                    onClick={() => {
-                      setIsQuickDeployOpen(true)
-                    }}
-                    className="p-2.5 rounded-[6px] bg-[#F8FAF9] hover:bg-[#F0F5F2] border border-[#E2E7E4] hover:border-[#005459]/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
-                  >
-                    <div className="font-semibold text-[12px] text-[#101d26] group-hover:text-[#005459] truncate">
-                      {p.name}
-                    </div>
-                    <div className="text-[10px] font-mono text-[#565f6b] flex items-center justify-between mt-1">
-                      <span>main</span>
-                      <span className="text-[#005459] opacity-0 group-hover:opacity-100 transition-opacity font-bold">
-                        Deploy →
-                      </span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+      ) : (
+        /* Overview View (Default: Clean, Focused, & Uncluttered) */
+        <div className="space-y-6">
+          {/* Subtle Platform Health Ribbon (takes only 36px instead of 220px DORA box) */}
+          <div className="bg-[#FAFBFB] border border-[#E2E7E4] rounded-[8px] px-4 py-2.5 flex flex-wrap items-center justify-between gap-2 text-[12px] shadow-2xs">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="font-semibold text-[#101d26]">Platform Health:</span>
+              <span className="text-[#565f6b]">
+                {servers.length} target fleet nodes online &bull; 0 incidents in 24h &bull; Elite velocity (4.7 deploys/wk)
+              </span>
             </div>
-          )}
+            <button
+              type="button"
+              onClick={() => setActiveViewTab('dora')}
+              className="font-semibold text-[#005459] hover:text-[#0B5459] hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+            >
+              <span>View DORA Telemetry</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* Two-Column Dashboard Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Recent Deployments Table (Clean, 6 rows, compact, no wrapping) */}
+            <div className="lg:col-span-8">
+              <RecentDeploymentsTable
+                deployments={filteredDeployments}
+                loading={loading}
+                title="Recent deployments"
+                showViewAll={true}
+                activeFilter={statusFilter}
+                onFilterChange={(f) => setStatusFilter(f)}
+                onViewAll={() => navigate('/deployments')}
+                limit={6}
+                compact={true}
+                onSelectDeployment={(d) => {
+                  setSelectedLog({
+                    id: d.id,
+                    service: d.project,
+                    server: d.server,
+                    status: d.rawStatus || d.status?.toUpperCase(),
+                    commitSha: d.commitSha,
+                  })
+                  setIsLogModalOpen(true)
+                }}
+                onRollback={canRollback ? (d) => setRollbackDeployment(d) : undefined}
+              />
+            </div>
+
+            {/* Right Column: Fleet Status & Quick Launch */}
+            <div className="lg:col-span-4 space-y-4">
+              {/* Active Deployment Card (Only shown if actively running or queued) */}
+              <RunningNowCard
+                activeDeploy={activeDeploy}
+                hideWhenIdle={true}
+                onViewLog={(d) => {
+                  setSelectedLog({
+                    id: d?.id,
+                    service: d?.project || 'Project',
+                    server: d?.server || 'Target',
+                    status: d?.rawStatus || 'RUNNING',
+                    commitSha: d?.commitSha,
+                  })
+                  setIsLogModalOpen(true)
+                }}
+                onQuickDeploy={() => setIsQuickDeployOpen(true)}
+              />
+
+              {/* Compact Target Fleet */}
+              <ServersListCard
+                servers={servers}
+                loading={loading}
+                compact={true}
+                onManageServers={() => navigate('/servers')}
+              />
+
+              {/* Quick Service Launchpad */}
+              {projects.length > 0 && (
+                <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[10px] p-4 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] font-bold text-[#565f6b] uppercase tracking-wider font-mono">
+                      Quick Launchpad
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => navigate('/projects')}
+                      className="text-[11px] font-medium text-[#005459] hover:underline cursor-pointer"
+                    >
+                      All projects →
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    {projects.slice(0, 4).map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          setIsQuickDeployOpen(true)
+                        }}
+                        className="p-2.5 rounded-[6px] bg-[#F8FAF9] hover:bg-[#F0F5F2] border border-[#E2E7E4] hover:border-[#005459]/40 text-left transition-all cursor-pointer group flex flex-col justify-between"
+                      >
+                        <div className="font-semibold text-[12px] text-[#101d26] group-hover:text-[#005459] truncate">
+                          {p.name}
+                        </div>
+                        <div className="text-[10px] font-mono text-[#565f6b] flex items-center justify-between mt-1">
+                          <span>main</span>
+                          <span className="text-[#005459] opacity-0 group-hover:opacity-100 transition-opacity font-bold">
+                            Deploy →
+                          </span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Log Streaming Modal */}
       <LogModal

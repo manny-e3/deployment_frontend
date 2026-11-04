@@ -1,5 +1,18 @@
 import { useState, useEffect } from 'react'
-import { X, Server, Folder, GitBranch, AlertCircle, Loader2, Edit3, Check, Activity, ShieldAlert } from 'lucide-react'
+import {
+  X,
+  Server,
+  Folder,
+  GitBranch,
+  AlertCircle,
+  Loader2,
+  Edit3,
+  Check,
+  Activity,
+  ShieldAlert,
+  RefreshCw,
+  Info,
+} from 'lucide-react'
 import { api } from '../services/api'
 import { TARGET_PRESETS } from './AddTargetModal'
 
@@ -13,6 +26,7 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
   const [autoRollbackOnFailure, setAutoRollbackOnFailure] = useState(true)
   const [requiresApproval, setRequiresApproval] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState(null)
+  const [isAtomicSymlink, setIsAtomicSymlink] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
@@ -38,6 +52,11 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
       // Detect matching preset
       const matched = TARGET_PRESETS.find((p) => p.script === currentScript)
       setSelectedPresetId(matched ? matched.id : null)
+      setIsAtomicSymlink(
+        matched?.architecture === 'atomic-symlink' ||
+        currentScript.includes('/releases/') ||
+        currentScript.includes('ln -sfn')
+      )
 
       setError(null)
       setSuccess(false)
@@ -62,8 +81,11 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
       return
     }
 
-    if (!trimmedPath.startsWith('/')) {
-      setError('Target path must be an absolute path starting with / (e.g. /home/username/public_html).')
+    const isUnixAbsolute = trimmedPath.startsWith('/')
+    const isWindowsAbsolute = /^[a-zA-Z]:[/\\]/.test(trimmedPath)
+
+    if (!isUnixAbsolute && !isWindowsAbsolute) {
+      setError('Target path must be an absolute path (e.g. /home/username/public_html or C:/xampp/htdocs).')
       return
     }
 
@@ -270,6 +292,7 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
                     onClick={() => {
                       setSelectedPresetId(preset.id)
                       setPostDeploy(preset.script)
+                      setIsAtomicSymlink(preset.architecture === 'atomic-symlink')
                     }}
                     className={`text-left p-2.5 rounded-[6px] border transition-all cursor-pointer ${
                       isSelected
@@ -277,10 +300,25 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
                         : 'border-[#CDD4D0] bg-[#FFFFFF] hover:border-[#8F9CA7] hover:bg-[#FAFBFB]'
                     }`}
                   >
-                    <div className="text-[12px] font-bold flex items-center gap-1.5">
+                    <div className="text-[12px] font-bold flex items-center justify-between gap-1.5">
                       <span className={isSelected ? 'text-[#005459]' : 'text-[#101d26]'}>
                         {preset.label}
                       </span>
+                      {preset.architecture === 'atomic-symlink' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                          Zero-Downtime
+                        </span>
+                      )}
+                      {preset.architecture === 'cpanel-sftp' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
+                          Zero-Shell
+                        </span>
+                      )}
+                      {preset.architecture === 'docker' && (
+                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
+                          Daemon
+                        </span>
+                      )}
                     </div>
                     <div className="text-[10px] text-[#565f6b] leading-tight mt-0.5">
                       {preset.desc}
@@ -289,6 +327,74 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
                 )
               })}
             </div>
+          </div>
+
+          {/* Architecture Mode: Atomic Zero-Downtime Symlink Toggle & Visual Card */}
+          <div className="p-3 bg-[#FAFBFB] border border-[#CDD4D0] rounded-[6px] space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-7 h-7 rounded-[4px] flex items-center justify-center shrink-0 ${isAtomicSymlink ? 'bg-[#EAF5EE] text-[#005459]' : 'bg-[#F4F6F5] text-[#565f6b]'}`}>
+                  <RefreshCw className={`w-3.5 h-3.5 ${isAtomicSymlink ? 'animate-spin' : ''}`} style={{ animationDuration: '6s' }} />
+                </div>
+                <div>
+                  <div className="text-[12px] font-bold text-[#101d26] flex items-center gap-1.5">
+                    <span>Atomic Zero-Downtime Symlink Deployment</span>
+                    {isAtomicSymlink && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-semibold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                        Enabled
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-[#565f6b]">
+                    Builds into <code className="font-mono text-[#101d26]">/releases/[ts]</code> and atomically updates <code className="font-mono text-[#005459]">/current</code> symlink.
+                  </div>
+                </div>
+              </div>
+
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isAtomicSymlink}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setIsAtomicSymlink(checked)
+                    if (checked) {
+                      const atomicPreset = TARGET_PRESETS.find((p) => p.architecture === 'atomic-symlink')
+                      if (atomicPreset) {
+                        setSelectedPresetId(atomicPreset.id)
+                        setPostDeploy(atomicPreset.script)
+                      }
+                    }
+                  }}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-[#CDD4D0] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[#005459]"></div>
+              </label>
+            </div>
+
+            {isAtomicSymlink && (
+              <div className="bg-[#FFFFFF] p-2.5 rounded border border-[#B8E0C5] text-[10px] font-mono space-y-1.5">
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Target Base:</span>
+                  <span className="font-semibold">{path ? path : '/var/www/my-app'}</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Active Symlink:</span>
+                  <span className="text-[#005459] font-bold">{path ? `${path}/current` : '/var/www/my-app/current'} ──&gt; /releases/[timestamp]</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Shared Storage:</span>
+                  <span>{path ? `${path}/shared/.env` : '/var/www/my-app/shared/.env'} &amp; storage/</span>
+                </div>
+                <div className="flex items-center justify-between text-[#101d26]">
+                  <span className="text-[#565f6b]">Rollback Duration:</span>
+                  <span className="text-[#2E8B57] font-semibold">&lt; 0.05s (Instant symlink pointer switch)</span>
+                </div>
+                <div className="text-[10px] font-sans text-[#565f6b] pt-1.5 border-t border-[#E2E7E4]">
+                  💡 <strong>Server Config:</strong> Point your web server document root to <code className="text-[#005459] bg-[#EAF5EE] px-1 py-0.5 rounded font-mono">{path ? `${path}/current/public` : '/var/www/my-app/current/public'}</code>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Post-Deploy Script */}

@@ -1,4 +1,4 @@
-# Deploy Portal — Internal Developer Platform
+# Slipway — Zero-Downtime Deployment Control Plane
 
 A mission-critical developer control plane built with **React (JavaScript / JSX)**, **Vite**, **Tailwind CSS v4**, and **React Router DOM v7** (no Next.js, no TypeScript).
 
@@ -8,9 +8,11 @@ All views are backed by real URLs with `react-router-dom` and `localStorage` ses
 
 | Route | View | Description |
 | :--- | :--- | :--- |
+| `/` | **Landing Page** | Public zero-downtime overview with simulated terminal & light/dark modes |
 | `/login` | **Sign In** | Developer console authentication card |
+| `/register` | **Register Super Admin** | Initial workspace and root authority setup |
 | `/dashboard` | **Dashboard** | Control plane telemetry, metric cards, recent deployments |
-| `/projects` | **Projects Catalog** | 6-card service grid, filters, and Git onboarding |
+| `/projects` | **Projects Catalog** | Service grid, filters, and Git onboarding |
 | `/projects/:projectId` | **Project Details** | Target servers table, auto-deploy switch, live terminal |
 | `/servers` | **Servers & Nodes** | Cluster nodes with status pills and IP addresses |
 | `/deployments` | **Deployments** | Full pipelines run history and streaming log viewer |

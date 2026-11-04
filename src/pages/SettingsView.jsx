@@ -36,10 +36,15 @@ import {
 } from 'lucide-react'
 import { api } from '../services/api'
 import { useToast } from '../context/ToastContext'
+import { FreezeWindowsManager } from '../components/FreezeWindowsManager'
+import { PolicyGuardrailsManager } from '../components/PolicyGuardrailsManager'
+import { ChatOpsSimulatorModal } from '../components/ChatOpsSimulatorModal'
 
 export function SettingsView() {
   const { addToast } = useToast()
   const [activeSubTab, setActiveSubTab] = useState('Webhooks')
+  const [isChatOpsModalOpen, setIsChatOpsModalOpen] = useState(false)
+  const [chatOpsPlatform, setChatOpsPlatform] = useState('slack')
   const [projects, setProjects] = useState([])
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [deliveries, setDeliveries] = useState([])
@@ -239,14 +244,16 @@ export function SettingsView() {
   }
 
   // ==========================================
-  // Notifications State
+  // Notifications State (ChatOps)
   // ==========================================
   const [notifications, setNotifications] = useState({
-    slackEnabled: true,
-    slackWebhookUrl: 'https://hooks.slack.com/services/T00000000/B00000000/xX83h91nKd82a',
-    slackChannel: '#deployments-prod',
-    discordEnabled: false,
-    discordWebhookUrl: '',
+    slackEnabled: Boolean(localStorage.getItem('deploy_portal_slack_url')),
+    slackWebhookUrl: localStorage.getItem('deploy_portal_slack_url') || '',
+    slackChannel: '#deployments',
+    teamsEnabled: Boolean(localStorage.getItem('deploy_portal_teams_url')),
+    teamsWebhookUrl: localStorage.getItem('deploy_portal_teams_url') || '',
+    discordEnabled: Boolean(localStorage.getItem('deploy_portal_discord_url')),
+    discordWebhookUrl: localStorage.getItem('deploy_portal_discord_url') || '',
     events: {
       onStart: true,
       onSuccess: true,
@@ -258,15 +265,26 @@ export function SettingsView() {
 
   const handleSaveNotifications = (e) => {
     e.preventDefault()
-    addToast({ title: 'Notification Settings Saved', desc: 'Chat webhook endpoints and routing rules updated.', type: 'success' })
+    if (notifications.slackWebhookUrl) {
+      localStorage.setItem('deploy_portal_slack_url', notifications.slackWebhookUrl)
+    }
+    if (notifications.teamsWebhookUrl) {
+      localStorage.setItem('deploy_portal_teams_url', notifications.teamsWebhookUrl)
+    }
+    if (notifications.discordWebhookUrl) {
+      localStorage.setItem('deploy_portal_discord_url', notifications.discordWebhookUrl)
+    }
+    addToast({ title: 'Notification Settings Saved', desc: 'Chat webhook endpoints and routing rules persisted.', type: 'success' })
   }
 
   const handleTestSlackNotification = () => {
-    addToast({
-      title: 'Slack Test Dispatched',
-      desc: `Simulation alert sent to channel ${notifications.slackChannel || '#deployments'}`,
-      type: 'success',
-    })
+    setChatOpsPlatform('slack')
+    setIsChatOpsModalOpen(true)
+  }
+
+  const handleTestTeamsNotification = () => {
+    setChatOpsPlatform('teams')
+    setIsChatOpsModalOpen(true)
   }
 
   const handleTestDiscordNotification = () => {
@@ -298,7 +316,7 @@ export function SettingsView() {
   // General Platform State
   // ==========================================
   const [general, setGeneral] = useState({
-    instanceName: 'Deploy Portal Control Plane',
+    instanceName: 'Slipway Control Plane',
     defaultEnvironment: 'Production',
     concurrencyLimit: '5',
     logRetention: '30 days',
@@ -313,7 +331,7 @@ export function SettingsView() {
   }
 
   // GitHub Actions Workflow YAML Template
-  const githubActionsYaml = `name: Deploy Portal Continuous Dispatch
+  const githubActionsYaml = `name: Slipway Continuous Dispatch
 
 on:
   push:
@@ -395,7 +413,8 @@ jobs:
               { id: 'General', label: 'General', icon: Sliders, badge: 'Core' },
               { id: 'Webhooks', label: 'Webhooks', icon: Webhook, badge: 'ACTIVE', badgeTeal: true },
               { id: 'API Tokens & CI/CD', label: 'API Tokens & CI/CD', icon: KeyRound, badge: `${tokens.length} active` },
-              { id: 'Notifications', label: 'Notifications', icon: Bell, badge: notifications.slackEnabled ? 'Slack' : 'Off' },
+              { id: 'Notifications', label: 'Notifications (ChatOps)', icon: Bell, badge: notifications.slackEnabled || notifications.teamsEnabled ? 'Active' : 'Off' },
+              { id: 'Policy Guardrails', label: 'Policy Guardrails', icon: ShieldCheck, badge: 'Enforcing', badgeTeal: true },
               { id: 'Security & Access', label: 'Security & Access', icon: Shield, badge: 'Strict' },
             ].map((item) => {
               const Icon = item.icon
@@ -1050,17 +1069,30 @@ jobs:
                     </span>
                   </div>
                   <p className="text-[12px] text-[#565f6b] mt-0.5">
-                    Forward pipeline health updates, deployment alerts, and approval sign-off requests to your engineering chat channels.
+                    Forward pipeline health updates, deployment alerts, and interactive sign-off cards to Slack, MS Teams, and Discord.
                   </p>
                 </div>
 
-                <button
-                  type="submit"
-                  className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer shrink-0"
-                >
-                  <Save className="w-3.5 h-3.5" />
-                  <span>Save Notification Settings</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChatOpsPlatform('slack')
+                      setIsChatOpsModalOpen(true)
+                    }}
+                    className="h-[34px] px-3.5 rounded-[6px] border border-[#005459]/40 bg-[#FFFFFF] hover:bg-[#E2F0FD] text-[#005459] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <span>Preview ChatOps Cards</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer shrink-0"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>Save Notification Settings</span>
+                  </button>
+                </div>
               </div>
 
               {/* Slack Card */}
@@ -1125,6 +1157,56 @@ jobs:
                       className="w-full h-[36px] px-3 rounded-[4px] border border-[#CDD4D0] bg-[#FFFFFF] font-mono text-[12px] text-[#101d26] focus:outline-none focus:border-[#005459]"
                     />
                   </div>
+                </div>
+              </div>
+
+              {/* Microsoft Teams Card */}
+              <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] p-5 shadow-xs space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#E2E7E4]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-[6px] bg-[#5059C9] text-white flex items-center justify-center font-bold text-[14px]">
+                      T
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-[14px] text-[#101d26]">Microsoft Teams Integration</h3>
+                      <p className="text-[11px] text-[#565f6b]">Adaptive Cards connector for Microsoft Teams channels</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleTestTeamsNotification}
+                      disabled={!notifications.teamsEnabled}
+                      className="h-[30px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F4F6F5] text-[#101d26] text-[11px] font-medium flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                    >
+                      <Send className="w-3 h-3 text-[#005459]" />
+                      <span>Preview &amp; Send Test</span>
+                    </button>
+
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={notifications.teamsEnabled}
+                        onChange={(e) => setNotifications((prev) => ({ ...prev, teamsEnabled: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-10 h-5 bg-[#CDD4D0] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-[#CDD4D0] after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-[#005459]"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[12px] font-semibold text-[#101d26]">
+                    MS Teams Webhook Connector URL
+                  </label>
+                  <input
+                    type="url"
+                    value={notifications.teamsWebhookUrl}
+                    onChange={(e) => setNotifications((prev) => ({ ...prev, teamsWebhookUrl: e.target.value }))}
+                    placeholder="https://outlook.office.com/webhook/..."
+                    className="w-full h-[36px] px-3 rounded-[4px] border border-[#CDD4D0] bg-[#FFFFFF] font-mono text-[12px] text-[#101d26] focus:outline-none focus:border-[#005459]"
+                  />
                 </div>
               </div>
 
@@ -1222,7 +1304,8 @@ jobs:
           {/* SUBTAB 4: SECURITY & GOVERNANCE                      */}
           {/* ==================================================== */}
           {activeSubTab === 'Security & Access' && (
-            <form onSubmit={handleSaveSecurity} className="space-y-5">
+            <div className="space-y-6">
+              <form onSubmit={handleSaveSecurity} className="space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1369,7 +1452,23 @@ jobs:
                 </div>
               </div>
             </form>
-          )}
+
+            {/* Policy-as-Code Guardrails Manager */}
+            <PolicyGuardrailsManager />
+
+            {/* Change Lockouts & Deployment Freeze Windows */}
+            <FreezeWindowsManager />
+          </div>
+        )}
+
+        {/* ==================================================== */}
+        {/* SUBTAB: POLICY GUARDRAILS                            */}
+        {/* ==================================================== */}
+        {activeSubTab === 'Policy Guardrails' && (
+          <div className="space-y-6">
+            <PolicyGuardrailsManager />
+          </div>
+        )}
 
           {/* ==================================================== */}
           {/* SUBTAB 5: GENERAL PLATFORM SETTINGS                  */}
@@ -1589,6 +1688,19 @@ jobs:
           </div>
         </div>
       )}
+
+      {/* ChatOps Simulator Modal */}
+      <ChatOpsSimulatorModal
+        isOpen={isChatOpsModalOpen}
+        onClose={() => setIsChatOpsModalOpen(false)}
+        project={projects.find((p) => p.id === selectedProjectId) || projects[0]}
+        webhookUrl={
+          chatOpsPlatform === 'slack'
+            ? notifications.slackWebhookUrl
+            : notifications.teamsWebhookUrl
+        }
+        platform={chatOpsPlatform}
+      />
     </div>
   )
 }

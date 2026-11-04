@@ -1,13 +1,19 @@
 // src/services/socket.js
-// Socket.IO Realtime Integration complying with Deploy Portal API - Frontend Integration Guide
+// Socket.IO Realtime Integration complying with Slipway API - Frontend Integration Guide
 
 import { io } from 'socket.io-client';
-import { getCsrfToken, api } from './api';
+import { getAuthToken, refreshSession, api } from './api';
 
-export const socket = io({
+const SOCKET_SERVER_URL = import.meta.env.VITE_API_URL?.trim() || undefined;
+
+export const socket = io(SOCKET_SERVER_URL, {
   path: '/socket.io',
+  transports: ['websocket', 'polling'],
   withCredentials: true,
   autoConnect: false,
+  auth: (cb) => {
+    cb({ token: getAuthToken() });
+  },
 });
 
 let sessionEndedHandler = null;
@@ -20,15 +26,9 @@ socket.on('connect_error', async (err) => {
   if (err?.message !== 'UNAUTHENTICATED') return; // Socket.IO handles network reconnects by itself
 
   try {
-    const ok = await fetch('/api/v1/auth/refresh', {
-      method: 'POST',
-      headers: {
-        'X-CSRF-Token': decodeURIComponent(getCsrfToken() ?? ''),
-      },
-      credentials: 'include',
-    }).then((r) => r.ok).catch(() => false);
-
+    const ok = await refreshSession();
     if (ok) {
+      socket.auth = { token: getAuthToken() };
       socket.connect();
     } else if (sessionEndedHandler) {
       sessionEndedHandler();
@@ -42,6 +42,7 @@ socket.on('connect_error', async (err) => {
  * Connect socket on login or session restore
  */
 export const connectSocket = () => {
+  socket.auth = { token: getAuthToken() };
   if (!socket.connected) {
     socket.connect();
   }

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
-import { X, Play, GitBranch, Server, Loader2, AlertCircle } from 'lucide-react'
+import { X, Play, GitBranch, Server, Loader2, AlertCircle, Lock } from 'lucide-react'
 import { api } from '../services/api'
+import { useAuth } from '../context/AuthContext'
+import { checkFreezeStatus } from '../utils/freezeWindows'
 
 export function QuickDeployModal({
   isOpen,
@@ -18,6 +20,12 @@ export function QuickDeployModal({
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [branch, setBranch] = useState('main')
   const [commitMsg, setCommitMsg] = useState('Manual release deployment')
+  const [emergencyBypassNote, setEmergencyBypassNote] = useState('')
+
+  const { role } = useAuth()
+  const freezeCheck = checkFreezeStatus('production', role)
+  const isLocked = freezeCheck.isBlocked && !freezeCheck.canBypass
+  const requiresBypass = freezeCheck.isBlocked && freezeCheck.canBypass
 
   useEffect(() => {
     if (!isOpen) {
@@ -54,13 +62,19 @@ export function QuickDeployModal({
       return
     }
 
+    if (isLocked) {
+      setError(`Deployments are locked by active freeze: "${freezeCheck.freeze.reason}".`)
+      return
+    }
+
     setSubmitting(true)
     setError(null)
     try {
       const res = await api(`/projects/${selectedProjectId}/deploy`, {
         method: 'POST',
         body: {
-          branch: branch.trim() || 'main'
+          branch: branch.trim() || 'main',
+          emergencyBypass: requiresBypass ? emergencyBypassNote : undefined
         }
       })
       if (onDeploySuccess) {
@@ -96,6 +110,38 @@ export function QuickDeployModal({
             <X className="w-4 h-4" />
           </button>
         </div>
+
+        {/* Active Freeze Window Alert */}
+        {freezeCheck.isBlocked && (
+          <div className="mx-5 mt-4 p-3 rounded-[6px] bg-[#FAEBE9] border border-[#F1B5AC] text-[12px] text-[#C2412D] space-y-1">
+            <div className="flex items-center gap-2 font-bold">
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>Production Deployment Freeze Active</span>
+            </div>
+            <p className="text-[11px] leading-relaxed">
+              Reason: <strong>{freezeCheck.freeze.reason}</strong> (Ends: {new Date(freezeCheck.freeze.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+            </p>
+            {requiresBypass ? (
+              <div className="pt-2 border-t border-[#F1B5AC]/60">
+                <span className="text-[11px] font-semibold text-[#902415] block mb-1">
+                  Admin Emergency Override Reason:
+                </span>
+                <input
+                  type="text"
+                  value={emergencyBypassNote}
+                  onChange={(e) => setEmergencyBypassNote(e.target.value)}
+                  placeholder="Enter emergency operational justification..."
+                  className="w-full h-[28px] px-2 bg-white border border-[#F1B5AC] rounded text-[11px] text-[#101d26] outline-none"
+                  required
+                />
+              </div>
+            ) : (
+              <p className="text-[11px] font-semibold text-[#902415]">
+                Only ADMIN emergency overrides are allowed during this freeze window.
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Error banner */}
         {error && (
@@ -189,7 +235,7 @@ export function QuickDeployModal({
             </button>
             <button
               type="submit"
-              disabled={submitting || projects.length === 0}
+              disabled={submitting || projects.length === 0 || isLocked || (requiresBypass && !emergencyBypassNote.trim())}
               className="h-[32px] px-4 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] active:bg-[#083F43] text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {submitting ? (

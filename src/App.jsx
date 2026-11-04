@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { ToastProvider } from './context/ToastContext'
+import { ThemeProvider } from './context/ThemeContext'
 import { AppLayout } from './components/AppLayout'
 import {
   DashboardView,
@@ -13,6 +14,10 @@ import {
   AuditLogView,
   SettingsView,
   SignIn,
+  Register,
+  OnboardingView,
+  AcceptInvite,
+  LandingPage,
 } from './pages'
 
 function ProtectedRoute({ children }) {
@@ -35,36 +40,49 @@ function ProtectedRoute({ children }) {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <Routes>
-          {/* Public Login Route */}
-          <Route path="/login" element={<SignIn />} />
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <Routes>
+            {/* Public Landing & Auth Routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<SignIn />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/accept-invite" element={<AcceptInvite />} />
 
-          {/* Protected Application Routes */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <AppLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardView />} />
-            <Route path="projects" element={<ProjectsView />} />
-            <Route path="projects/new" element={<CreateProjectView />} />
-            <Route path="projects/:projectId" element={<ProjectDetailView />} />
-            <Route path="servers" element={<ServersView />} />
-            <Route path="deployments" element={<DeploymentsView />} />
-            <Route path="users" element={<UsersView />} />
-            <Route path="audit-log" element={<AuditLogView />} />
-            <Route path="settings" element={<SettingsView />} />
-            {/* Catch-all fallback */}
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
-          </Route>
-        </Routes>
-      </AuthProvider>
-    </ToastProvider>
+            {/* Super Admin Guided Onboarding Route */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <OnboardingView />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected Application Routes */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <AppLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/dashboard" element={<DashboardView />} />
+              <Route path="/projects" element={<ProjectsView />} />
+              <Route path="/projects/new" element={<CreateProjectView />} />
+              <Route path="/projects/:projectId" element={<ProjectDetailView />} />
+              <Route path="/servers" element={<ServersView />} />
+              <Route path="/deployments" element={<DeploymentsView />} />
+              <Route path="/users" element={<UsersView />} />
+              <Route path="/audit-log" element={<AuditLogView />} />
+              <Route path="/settings" element={<SettingsView />} />
+              {/* Catch-all fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   )
 }

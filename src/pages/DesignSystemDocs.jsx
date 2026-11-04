@@ -16,41 +16,41 @@ export function DesignSystemDocs() {
 
   const colorPalettes = [
     {
-      group: 'Surface & Canvas Tokens',
+      group: 'Surface & Canvas Tokens (Modern Neutral)',
       colors: [
-        { name: 'Canvas Base', hex: '#EDF0EE', desc: 'Cool, grounding stone gray' },
-        { name: 'Surface Elevation', hex: '#FFFFFF', desc: 'Cards, panels, content blocks' },
-        { name: 'Surface Inset / Muted', hex: '#F4F6F5', desc: 'Code blocks, table headers' },
-        { name: 'Sidebar Surface', hex: '#17202A', desc: 'Deep slate navy rail' },
-        { name: 'Sidebar Active', hex: '#24313E', desc: 'Active navigation item' },
-        { name: 'Border Default', hex: '#CDD4D0', desc: 'Precise 1px boundaries' },
-        { name: 'Border Subdued', hex: '#E2E7E4', desc: 'Internal row dividers' },
+        { name: 'Canvas Base', hex: '#F8FAFC', desc: 'Calm, modern slate neutral' },
+        { name: 'Surface Elevation', hex: '#FFFFFF', desc: 'Cards, panels with micro-shadow' },
+        { name: 'Surface Inset / Muted', hex: '#F1F5F9', desc: 'Code blocks, table headers' },
+        { name: 'Sidebar Surface', hex: '#0F172A', desc: 'Deep slate-900 command rail' },
+        { name: 'Sidebar Active', hex: '#1E293B', desc: 'Active navigation item' },
+        { name: 'Border Default', hex: '#E2E8F0', desc: 'Subtle 1px boundary (Zero fatigue)' },
+        { name: 'Border Subdued', hex: '#F1F5F9', desc: 'Internal row dividers' },
       ],
     },
     {
       group: 'Text & Typography Tokens',
       colors: [
-        { name: 'Text Primary', hex: '#17202A', desc: 'High-contrast technical readability' },
-        { name: 'Text Secondary', hex: '#5E6B76', desc: 'Metadata, descriptions, muted' },
+        { name: 'Text Primary', hex: '#0F172A', desc: 'High-contrast technical readability' },
+        { name: 'Text Secondary', hex: '#475569', desc: 'Metadata, descriptions, muted' },
         { name: 'Text Inverse', hex: '#FFFFFF', desc: 'White text on dark surfaces' },
-        { name: 'Text Sidebar Muted', hex: '#8F9CA7', desc: 'Nav links and secondary rail text' },
+        { name: 'Text Sidebar Muted', hex: '#94A3B8', desc: 'Nav links and secondary rail text' },
       ],
     },
     {
       group: 'Interactive & Brand Accent',
       colors: [
-        { name: 'Primary Action', hex: '#0F6E74', desc: 'Deep operational teal driver' },
-        { name: 'Primary Hover', hex: '#0B5459', desc: 'Darker teal hover state' },
-        { name: 'Primary Active', hex: '#083F43', desc: 'Pressed state' },
-        { name: 'Focus Ring', hex: 'rgba(15, 110, 116, 0.15)', desc: '2px offset ring' },
+        { name: 'Primary Action', hex: '#0D9488', desc: 'Modern operational teal driver' },
+        { name: 'Primary Hover', hex: '#0F766E', desc: 'Focused teal hover state' },
+        { name: 'Primary Active', hex: '#115E59', desc: 'Pressed state' },
+        { name: 'Focus Ring', hex: 'rgba(13, 148, 136, 0.2)', desc: '2px offset ring' },
       ],
     },
     {
       group: 'Telemetry & Deployment States',
       colors: [
-        { name: 'Success Solid', hex: '#2E8B57', bg: '#EAF5EE', border: '#B8E0C5', desc: 'Deployed pipeline' },
-        { name: 'Running / Queued', hex: '#B87E0C', bg: '#FAF3E7', border: '#F1D6A4', desc: 'In-flight canary/build' },
-        { name: 'Failed / Incident', hex: '#C2412D', bg: '#FAEBE9', border: '#F1B5AC', desc: 'Failed deployment' },
+        { name: 'Success / Ready', hex: '#10B981', bg: '#ECFDF5', border: '#A7F3D0', desc: 'Verified live release' },
+        { name: 'Running / Queued', hex: '#F59E0B', bg: '#FEF3C7', border: '#FDE68A', desc: 'In-flight build/rollout' },
+        { name: 'Failed / Incident', hex: '#EF4444', bg: '#FEF2F2', border: '#FECACA', desc: 'Failed deployment' },
       ],
     },
   ]
@@ -77,10 +77,10 @@ export function DesignSystemDocs() {
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-[4px] bg-[#0F6E74] text-white uppercase">
                 Design System v1.0
               </span>
-              <span className="text-[12px] font-mono text-[#5E6B76]">deploy-portal.spec</span>
+              <span className="text-[12px] font-mono text-[#5E6B76]">slipway.spec</span>
             </div>
             <h2 className="text-[20px] font-semibold text-[#17202A] tracking-tight">
-              Deploy Portal Design System Specifications
+              Slipway Design System Specifications
             </h2>
             <p className="text-[13px] text-[#5E6B76] mt-1 max-w-3xl leading-relaxed">
               Utilitarian, calm, hyper-focused, and unmistakably functional. Engineered to oversee mission-critical

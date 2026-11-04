@@ -38,13 +38,34 @@ export function LinuxLogo({ className = 'w-4 h-4' }) {
   )
 }
 
+// Custom cPanel / Web Hosting Logo
+export function CPanelLogo({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM14 13v4h-4v-4H7l5-5 5 5h-3z" />
+    </svg>
+  )
+}
+
+// Custom Docker Whale Logo
+export function DockerLogo({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
+      <path d="M13.983 11.078h2.119a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.119a.185.185 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.954-5.43h2.118a.186.186 0 00.186-.186V3.574a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m0 2.716h2.118a.187.187 0 00.186-.186V6.29a.186.186 0 00-.186-.185h-2.118a.185.185 0 00-.185.185v1.887c0 .102.082.186.185.186m-2.93 0h2.12a.186.186 0 00.184-.186V6.29a.185.185 0 00-.185-.185H8.1a.185.185 0 00-.185.185v1.887c0 .102.083.186.185.186m-2.964 0h2.119a.186.186 0 00.185-.186V6.29a.185.185 0 00-.185-.185H5.136a.186.186 0 00-.186.185v1.887c0 .102.084.186.186.186m5.893 2.715h2.118a.186.186 0 00.186-.185V9.006a.186.186 0 00-.186-.186h-2.118a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185m-2.929 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186H8.1a.185.185 0 00-.185.185v1.888c0 .102.083.185.185.185m-2.964 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186H5.136a.186.186 0 00-.186.185v1.888c0 .102.084.185.186.185m-2.928 0h2.119a.185.185 0 00.185-.185V9.006a.185.185 0 00-.185-.186H2.208a.185.185 0 00-.185.185v1.888c0 .102.082.185.185.185M23.792 11.2c-.144-.09-.594-.287-1.353-.16-.27-1.95-1.782-3.411-3.642-3.411-.324 0-.648.046-.972.138A7.777 7.777 0 0013.983 6.6V3.574A1.185 1.185 0 0012.798 2.39h-2.118a1.185 1.185 0 00-1.185 1.185V6.104H7.376a1.185 1.185 0 00-1.185 1.186v.816H4.072a1.185 1.185 0 00-1.185 1.185v.816H1.144A1.144 1.144 0 000 11.246c0 4.62 3.78 8.358 8.448 8.358 5.768 0 10.354-3.626 11.83-8.818.847.16 1.704.032 2.158-.27.234-.156.405-.386.405-.658a.952.952 0 00-.049-.658" />
+    </svg>
+  )
+}
+
 export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = null }) {
-  const [serverType, setServerType] = useState('LINUX') // 'LINUX' | 'WINDOWS' | 'DOCKER'
+  const [serverType, setServerType] = useState('LINUX') // 'LINUX' | 'WINDOWS' | 'CPANEL_SFTP' | 'DOCKER'
   const [serverName, setServerName] = useState('')
   const [hostIp, setHostIp] = useState('')
   const [port, setPort] = useState('22')
   const [username, setUsername] = useState('deploy')
   const [windowsProtocol, setWindowsProtocol] = useState('WINRM_HTTP') // 'WINRM_HTTP' | 'WINRM_HTTPS' | 'OPENSSH'
+  const [sftpProtocol, setSftpProtocol] = useState('SFTP') // 'SFTP' | 'FTPS'
+  const [cpanelRemoteRoot, setCpanelRemoteRoot] = useState('/public_html')
+  const [dockerProtocol, setDockerProtocol] = useState('TLS_SOCKET') // 'TLS_SOCKET' | 'SSH_SOCKET' | 'PLAIN_TCP'
   const [authMethod, setAuthMethod] = useState('password') // 'private-key' | 'password'
   const [privateKey, setPrivateKey] = useState('')
   const [password, setPassword] = useState('')
@@ -65,12 +86,37 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
         serverToEdit.port === 5986 ||
         serverToEdit.name?.toLowerCase().includes('win')
 
-      setServerType(isWin ? 'WINDOWS' : 'LINUX')
+      const isCpanel =
+        serverToEdit.osType === 'CPANEL_SFTP' ||
+        serverToEdit.serverType === 'CPANEL_SFTP' ||
+        serverToEdit.protocol === 'SFTP' ||
+        serverToEdit.protocol === 'FTPS' ||
+        serverToEdit.name?.toLowerCase().includes('cpanel') ||
+        serverToEdit.iconType === 'cpanel'
+
+      const isDocker =
+        serverToEdit.osType === 'DOCKER' ||
+        serverToEdit.serverType === 'DOCKER' ||
+        serverToEdit.port === 2376 ||
+        serverToEdit.protocol?.includes('DOCKER') ||
+        serverToEdit.name?.toLowerCase().includes('docker') ||
+        serverToEdit.iconType === 'docker'
+
+      if (isCpanel) {
+        setServerType('CPANEL_SFTP')
+      } else if (isDocker) {
+        setServerType('DOCKER')
+      } else if (isWin) {
+        setServerType('WINDOWS')
+      } else {
+        setServerType('LINUX')
+      }
+
       setServerName(serverToEdit.name || '')
       setHostIp(serverToEdit.host || serverToEdit.hostname || '')
 
-      let extractedPort = isWin ? '5985' : '22'
-      let extractedUser = isWin ? 'Administrator' : 'deploy'
+      let extractedPort = isCpanel ? '22' : isDocker ? '2376' : isWin ? '5985' : '22'
+      let extractedUser = isCpanel ? 'cpanel_user' : isDocker ? 'root' : isWin ? 'Administrator' : 'deploy'
 
       if (serverToEdit.address) {
         const parts = serverToEdit.address.split('@')
@@ -89,13 +135,21 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
         if (p === '5986') setWindowsProtocol('WINRM_HTTPS')
         else if (p === '22') setWindowsProtocol('OPENSSH')
         else setWindowsProtocol('WINRM_HTTP')
+      } else if (isCpanel) {
+        if (serverToEdit.protocol === 'FTPS') setSftpProtocol('FTPS')
+        else setSftpProtocol('SFTP')
+      } else if (isDocker) {
+        if (serverToEdit.protocol?.includes('SSH')) setDockerProtocol('SSH_SOCKET')
+        else if (serverToEdit.protocol?.includes('PLAIN')) setDockerProtocol('PLAIN_TCP')
+        else setDockerProtocol('TLS_SOCKET')
       }
 
       setUsername(serverToEdit.username || extractedUser)
       const isPass =
         serverToEdit.authType === 'Password' ||
         serverToEdit.authType === 'PASSWORD' ||
-        isWin
+        isWin ||
+        isCpanel
       setAuthMethod(isPass ? 'password' : 'private-key')
       setPrivateKey('')
       setPassword('')
@@ -111,6 +165,9 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       setPort('22')
       setUsername('deploy')
       setWindowsProtocol('WINRM_HTTP')
+      setSftpProtocol('SFTP')
+      setCpanelRemoteRoot('/public_html')
+      setDockerProtocol('TLS_SOCKET')
       setAuthMethod('password')
       setPrivateKey('')
       setPassword('')
@@ -122,7 +179,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
     }
   }, [serverToEdit, isOpen])
 
-  // Handle switching server type (Linux vs Windows)
+  // Handle switching server type
   const handleServerTypeChange = (type) => {
     setServerType(type)
     setTestStatus('idle')
@@ -133,7 +190,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       else if (windowsProtocol === 'WINRM_HTTPS') setPort('5986')
       else setPort('22')
 
-      if (username === 'deploy' || username === 'root') {
+      if (username === 'deploy' || username === 'root' || username === 'cpanel_user') {
         setUsername('Administrator')
       }
       setAuthMethod('password')
@@ -142,9 +199,15 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       if (username === 'Administrator') {
         setUsername('deploy')
       }
+    } else if (type === 'CPANEL_SFTP') {
+      setPort(sftpProtocol === 'FTPS' ? '21' : '22')
+      if (username === 'Administrator' || username === 'deploy') {
+        setUsername('travaiqc')
+      }
+      setAuthMethod('password')
     } else if (type === 'DOCKER') {
-      setPort('2375')
-      if (username === 'Administrator') {
+      setPort(dockerProtocol === 'SSH_SOCKET' ? '22' : '2376')
+      if (username === 'Administrator' || username === 'cpanel_user') {
         setUsername('root')
       }
     }
@@ -165,6 +228,50 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
     }
   }
 
+  // Intelligently parse pasted connection strings like "user@domain.com@10.10.15.59:5985"
+  const handleHostChange = (raw) => {
+    let val = (raw || '').trim()
+    if (!val) {
+      setHostIp('')
+      return
+    }
+
+    let parsedPort = null
+    const portMatch = val.match(/:(\d+)$/)
+    if (portMatch) {
+      parsedPort = portMatch[1]
+      val = val.slice(0, -portMatch[0].length)
+    }
+
+    if (val.includes('@')) {
+      const lastAt = val.lastIndexOf('@')
+      const parsedUser = val.slice(0, lastAt)
+      const parsedHost = val.slice(lastAt + 1)
+
+      if (parsedHost) {
+        setHostIp(parsedHost)
+        if (parsedUser) {
+          setUsername(parsedUser)
+          if (parsedUser.includes('@')) {
+            const domainPart = parsedUser.split('@')[1]
+            if (domainPart) setWindowsDomain(domainPart)
+          }
+        }
+        if (parsedPort) {
+          setPort(parsedPort)
+          if (parsedPort === '5985' || parsedPort === '5986') {
+            setServerType('WINDOWS')
+            setWindowsProtocol(parsedPort === '5986' ? 'WINRM_HTTPS' : 'WINRM_HTTP')
+            setAuthMethod('password')
+          }
+        }
+        return
+      }
+    }
+
+    setHostIp(raw)
+  }
+
   if (!isOpen) return null
 
   const handleTestConnection = () => {
@@ -173,6 +280,10 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       setTestStatus('success')
       if (serverType === 'WINDOWS') {
         setTestDetails('WinRM responder active · PowerShell 7.4 runtime detected · Windows Server 2022')
+      } else if (serverType === 'CPANEL_SFTP') {
+        setTestDetails('SFTP subsystem active · Handshake verified · Write permissions on remote web root confirmed (Zero-Shell)')
+      } else if (serverType === 'DOCKER') {
+        setTestDetails('Docker Engine daemon reachable · Docker API v1.47 · Engine 27.3.1-ce online')
       } else {
         setTestDetails('OpenSSH 8.9p1 handshake successful · Git 2.43.0 available')
       }
@@ -217,17 +328,56 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       host: trimmedHost,
       port: Number(port) || (serverType === 'WINDOWS' ? 5985 : 22),
       username: trimmedUser,
-      authType: authMethod === 'private-key' ? 'KEY' : 'PASSWORD',
     }
 
+    const currentAuthType = authMethod === 'private-key' ? 'KEY' : 'PASSWORD'
+    const originalAuthType = serverToEdit
+      ? (serverToEdit.authType === 'SSH Key' || serverToEdit.authType === 'KEY' ? 'KEY' : 'PASSWORD')
+      : null
+
     if (authMethod === 'private-key' && privateKey.trim()) {
+      apiPayload.authType = 'KEY'
       apiPayload.secret = privateKey.trim()
       if (passphrase.trim()) {
         apiPayload.passphrase = passphrase.trim()
       }
     } else if (authMethod === 'password' && password) {
+      apiPayload.authType = 'PASSWORD'
       apiPayload.secret = password
+    } else if (!serverToEdit) {
+      apiPayload.authType = currentAuthType
+    } else if (currentAuthType !== originalAuthType) {
+      setFormError(`Please enter the new ${authMethod === 'password' ? 'password' : 'private key'} when changing authentication type.`)
+      setIsSubmitting(false)
+      return
     }
+
+    const resolvedProtocol =
+      serverType === 'WINDOWS'
+        ? windowsProtocol
+        : serverType === 'CPANEL_SFTP'
+        ? sftpProtocol
+        : serverType === 'DOCKER'
+        ? dockerProtocol
+        : 'SSH'
+
+    const resolvedIcon =
+      serverType === 'WINDOWS'
+        ? 'windows'
+        : serverType === 'CPANEL_SFTP'
+        ? 'cpanel'
+        : serverType === 'DOCKER'
+        ? 'docker'
+        : 'cloud'
+
+    const resolvedVersion =
+      serverType === 'WINDOWS'
+        ? 'PowerShell 7.4'
+        : serverType === 'CPANEL_SFTP'
+        ? 'Pure SFTP (Zero-Shell)'
+        : serverType === 'DOCKER'
+        ? 'Docker API v1.47'
+        : 'git 2.43.0'
 
     try {
       if (serverToEdit) {
@@ -244,12 +394,13 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             hostname: res.host || trimmedHost,
             osType: serverType,
             serverType: serverType,
-            protocol: serverType === 'WINDOWS' ? windowsProtocol : 'SSH',
+            protocol: resolvedProtocol,
             domain: serverType === 'WINDOWS' && windowsDomain.trim() ? windowsDomain.trim() : undefined,
+            cpanelRemoteRoot: serverType === 'CPANEL_SFTP' ? cpanelRemoteRoot : undefined,
             address: `${res.username || trimmedUser}@${res.host || trimmedHost}:${res.port || port}`,
             authType: res.authType === 'KEY' ? 'SSH Key' : 'Password',
-            iconType: serverType === 'WINDOWS' ? 'windows' : 'cloud',
-            gitVersion: serverType === 'WINDOWS' ? 'PowerShell 7.4' : (res.gitVersion || 'git 2.43.0'),
+            iconType: resolvedIcon,
+            gitVersion: serverType === 'WINDOWS' ? 'PowerShell 7.4' : (res.gitVersion || resolvedVersion),
           })
           onClose()
           return
@@ -268,17 +419,18 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             hostname: res.host || trimmedHost,
             osType: serverType,
             serverType: serverType,
-            protocol: serverType === 'WINDOWS' ? windowsProtocol : 'SSH',
+            protocol: resolvedProtocol,
             domain: serverType === 'WINDOWS' && windowsDomain.trim() ? windowsDomain.trim() : undefined,
+            cpanelRemoteRoot: serverType === 'CPANEL_SFTP' ? cpanelRemoteRoot : undefined,
             address: `${res.username || trimmedUser}@${res.host || trimmedHost}:${res.port || port}`,
             authType: res.authType === 'KEY' ? 'SSH Key' : 'Password',
             authKeyType: 'ed25519',
             pipelineCount: 0,
             pipelineProjects: 'None',
             status: 'online',
-            gitVersion: serverType === 'WINDOWS' ? 'PowerShell 7.4' : 'git 2.43.0',
+            gitVersion: resolvedVersion,
             checkedAgo: 'Just added',
-            iconType: serverType === 'WINDOWS' ? 'windows' : 'cloud',
+            iconType: resolvedIcon,
           })
           onClose()
           return
@@ -308,16 +460,17 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             hostname: trimmedHost,
             osType: serverType,
             serverType: serverType,
-            protocol: payload.protocol,
+            protocol: resolvedProtocol,
+            cpanelRemoteRoot: serverType === 'CPANEL_SFTP' ? cpanelRemoteRoot : undefined,
             address: `${trimmedUser}@${trimmedHost}:${port}`,
             authType: authMethod === 'private-key' ? 'SSH Key' : 'Password',
             authKeyType: 'ed25519',
             pipelineCount: serverToEdit?.pipelineCount || 0,
             pipelineProjects: serverToEdit?.pipelineProjects || 'None',
             status: serverToEdit?.status || 'online',
-            gitVersion: serverType === 'WINDOWS' ? 'PowerShell 7.4' : 'git 2.44.0',
+            gitVersion: resolvedVersion,
             checkedAgo: 'Just updated',
-            iconType: serverType === 'WINDOWS' ? 'windows' : 'cloud',
+            iconType: resolvedIcon,
           })
         }
         onClose()
@@ -382,7 +535,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
           {/* 1. Server Type / OS Selection */}
           <div>
             <label className="block text-[12px] font-semibold text-[#101d26] mb-2 uppercase font-mono tracking-wider">
-              Server Type &amp; Operating System
+              Server Type &amp; Operating Protocol
             </label>
             <div className="grid grid-cols-2 gap-2.5">
               {/* Linux Card */}
@@ -445,6 +598,70 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                   </div>
                   <div className="text-[11px] text-[#565f6b] mt-0.5">
                     WinRM / OpenSSH · PowerShell · IIS
+                  </div>
+                </div>
+              </button>
+
+              {/* cPanel / Web Hosting (SFTP) Card */}
+              <button
+                type="button"
+                onClick={() => handleServerTypeChange('CPANEL_SFTP')}
+                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                  serverType === 'CPANEL_SFTP'
+                    ? 'border-[#D9531E] bg-[#FFF8F3] ring-2 ring-[#D9531E]/25 text-[#101d26]'
+                    : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
+                    serverType === 'CPANEL_SFTP'
+                      ? 'bg-[#D9531E] text-white'
+                      : 'bg-[#F4F6F5] text-[#565f6b]'
+                  }`}
+                >
+                  <CPanelLogo className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[13px] font-bold text-[#101d26] flex items-center gap-1.5">
+                    <span>cPanel / SFTP Host</span>
+                    {serverType === 'CPANEL_SFTP' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#D9531E]" />
+                    )}
+                  </div>
+                  <div className="text-[11px] text-[#565f6b] mt-0.5">
+                    Pure SFTP · Zero-Shell · Bypasses &quot;Unable to exec&quot;
+                  </div>
+                </div>
+              </button>
+
+              {/* Remote Docker Host Card */}
+              <button
+                type="button"
+                onClick={() => handleServerTypeChange('DOCKER')}
+                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                  serverType === 'DOCKER'
+                    ? 'border-[#0288D1] bg-[#F0F8FF] ring-2 ring-[#0288D1]/25 text-[#101d26]'
+                    : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
+                }`}
+              >
+                <div
+                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
+                    serverType === 'DOCKER'
+                      ? 'bg-[#0288D1] text-white'
+                      : 'bg-[#F4F6F5] text-[#565f6b]'
+                  }`}
+                >
+                  <DockerLogo className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-[13px] font-bold text-[#101d26] flex items-center gap-1.5">
+                    <span>Remote Docker Host</span>
+                    {serverType === 'DOCKER' && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#0288D1]" />
+                    )}
+                  </div>
+                  <div className="text-[11px] text-[#565f6b] mt-0.5">
+                    Docker Engine API · TLS Socket · Compose
                   </div>
                 </div>
               </button>
@@ -512,6 +729,107 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             </div>
           )}
 
+          {/* cPanel / SFTP Configuration Banner */}
+          {serverType === 'CPANEL_SFTP' && (
+            <div className="p-3.5 bg-[#FFF8F3] border border-[#F6D0B0] rounded-[8px] space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-bold text-[#D9531E] flex items-center gap-1.5">
+                  <CPanelLogo className="w-3.5 h-3.5" />
+                  <span>cPanel &amp; Web Hosting (SFTP / No-Shell Mode)</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#D9531E] bg-[#FFEADA] px-2 py-0.5 rounded font-semibold">
+                  Pure SFTP File Transfer
+                </span>
+              </div>
+              <p className="text-[11px] text-[#703010] leading-relaxed">
+                <strong>Resolves &quot;Unable to exec&quot; restrictions:</strong> Uses pure SFTP (Port 22 or 21) file streaming without requiring interactive SSH shell command execution (<code className="bg-[#FFEADA] px-1 py-0.2 rounded font-mono">exec</code>). Ideal for shared hosting, cPanel accounts (e.g. travaiq.com), and jailed environments.
+              </p>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div>
+                  <label className="block text-[11px] font-medium text-[#101d26] mb-1">
+                    SFTP Protocol
+                  </label>
+                  <select
+                    value={sftpProtocol}
+                    onChange={(e) => {
+                      setSftpProtocol(e.target.value)
+                      setPort(e.target.value === 'FTPS' ? '21' : '22')
+                    }}
+                    className="w-full h-[32px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-white font-mono text-[11px]"
+                  >
+                    <option value="SFTP">SFTP (SSH File Transfer - Port 22)</option>
+                    <option value="FTPS">FTPS (Explicit TLS - Port 21)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-[#101d26] mb-1">
+                    Default Remote Web Root
+                  </label>
+                  <input
+                    type="text"
+                    value={cpanelRemoteRoot}
+                    onChange={(e) => setCpanelRemoteRoot(e.target.value)}
+                    placeholder="/public_html"
+                    className="w-full h-[32px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-white font-mono text-[11px]"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Docker Host Configuration Banner */}
+          {serverType === 'DOCKER' && (
+            <div className="p-3.5 bg-[#F0F8FF] border border-[#BCE0FD] rounded-[8px] space-y-2.5 animate-in fade-in duration-200">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] font-bold text-[#0288D1] flex items-center gap-1.5">
+                  <DockerLogo className="w-3.5 h-3.5" />
+                  <span>Remote Docker Host (Docker Engine Daemon API)</span>
+                </span>
+                <span className="text-[10px] font-mono text-[#0288D1] bg-[#E1F2FE] px-2 py-0.5 rounded font-semibold">
+                  Docker Engine &amp; Compose
+                </span>
+              </div>
+              <p className="text-[11px] text-[#025684] leading-relaxed">
+                Connects directly to the Docker Engine daemon over TCP socket (<code className="bg-[#E1F2FE] px-1 py-0.2 rounded font-mono">tcp://:2376</code>) or SSH socket. Orchestrates container image pulls, rolling container updates, container health checks, and Docker Compose without manual shell scripting.
+              </p>
+              <div className="space-y-1 pt-1">
+                <label className="block text-[11px] font-medium text-[#101d26] mb-1">
+                  Docker Daemon Connection Mode
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDockerProtocol('TLS_SOCKET')
+                      setPort('2376')
+                    }}
+                    className={`py-1.5 px-2 rounded-[5px] text-[11px] font-mono font-medium border text-center transition-colors cursor-pointer ${
+                      dockerProtocol === 'TLS_SOCKET'
+                        ? 'bg-[#0288D1] text-white border-[#0288D1] font-bold shadow-2xs'
+                        : 'bg-white text-[#565f6b] border-[#CDD4D0] hover:bg-[#F4F6F5]'
+                    }`}
+                  >
+                    Docker TLS Socket (Port 2376)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDockerProtocol('SSH_SOCKET')
+                      setPort('22')
+                    }}
+                    className={`py-1.5 px-2 rounded-[5px] text-[11px] font-mono font-medium border text-center transition-colors cursor-pointer ${
+                      dockerProtocol === 'SSH_SOCKET'
+                        ? 'bg-[#0288D1] text-white border-[#0288D1] font-bold shadow-2xs'
+                        : 'bg-white text-[#565f6b] border-[#CDD4D0] hover:bg-[#F4F6F5]'
+                    }`}
+                  >
+                    Docker over SSH (Port 22)
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Server Name */}
           <div>
             <label className="block text-[12px] font-medium text-[#101d26] mb-1">
@@ -540,7 +858,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
               <input
                 type="text"
                 value={hostIp}
-                onChange={(e) => setHostIp(e.target.value)}
+                onChange={(e) => handleHostChange(e.target.value)}
                 placeholder={
                   serverType === 'WINDOWS'
                     ? 'e.g. winserver01.corp.net or 192.168.1.150'

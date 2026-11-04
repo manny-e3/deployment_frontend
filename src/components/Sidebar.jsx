@@ -58,7 +58,7 @@ export function Sidebar({
               </div>
               <div className="truncate">
                 <div className="text-[13px] font-semibold text-white tracking-tight leading-none">
-                  DEPLOY PORTAL
+                  SLIPWAY
                 </div>
                 <div className="text-[10px] font-mono text-[#8F9CA7] mt-0.5">
                   ops.internal // v2.4

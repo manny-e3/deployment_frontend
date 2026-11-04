@@ -15,7 +15,12 @@ import {
   Monitor,
   ScrollText,
   AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  Crown,
+  Building2,
+  Copy,
+  Check,
+  Sparkles
 } from 'lucide-react'
 import { ROLE_DEFINITIONS } from '../data/usersData'
 import { InviteUserModal } from '../components/InviteUserModal'
@@ -25,7 +30,7 @@ import { can } from '../utils/permissions'
 import { api, ApiError } from '../services/api'
 
 export function UsersView() {
-  const { user: currentUser, role } = useAuth()
+  const { user: currentUser, role, isSuperAdmin, organizationName } = useAuth()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
@@ -34,7 +39,9 @@ export function UsersView() {
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [tempPasswordModal, setTempPasswordModal] = useState({ isOpen: false, password: '', userEmail: '' })
+  const [tempPasswordModal, setTempPasswordModal] = useState({ isOpen: false, password: '', userEmail: '', inviteLink: '' })
+  const [copiedGeneralInvite, setCopiedGeneralInvite] = useState(false)
+  const [copiedMemberId, setCopiedMemberId] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -42,20 +49,69 @@ export function UsersView() {
       setLoading(true)
       try {
         const res = await api('/users', { query: { limit: 50 } })
+        let items = []
         if (res && res.items && isMounted) {
-          // Merge with avatars and titles
-          const mapped = res.items.map((u) => ({
+          items = res.items.map((u) => ({
             ...u,
             roleTitle: u.role === 'ADMIN' ? 'Admin Engineer' : u.role === 'DEPLOYER' ? 'Platform Deployer' : 'Telemetry Observer',
             isYou: u.email?.toLowerCase() === currentUser?.email?.toLowerCase(),
             status: u.isActive ? 'Active' : 'Deactivated',
             lastActive: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleTimeString() : 'Never',
           }))
-          setUsers(mapped)
         }
+
+        // Also merge local onboarded members
+        const localOnboarded = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
+        const existingEmails = new Set(items.map((i) => i.email?.toLowerCase()))
+
+        for (const loc of localOnboarded) {
+          if (!existingEmails.has(loc.email?.toLowerCase())) {
+            items.push({
+              ...loc,
+              isYou: loc.email?.toLowerCase() === currentUser?.email?.toLowerCase(),
+            })
+            existingEmails.add(loc.email?.toLowerCase())
+          }
+        }
+
+        // Ensure current user is included and marked properly
+        if (currentUser && !existingEmails.has(currentUser.email?.toLowerCase())) {
+          items.unshift({
+            id: currentUser.id || 'usr_current',
+            name: currentUser.name || 'Alex Mercer',
+            email: currentUser.email || 'alex@company.internal',
+            role: currentUser.role || (isSuperAdmin ? 'SUPER_ADMIN' : 'DEPLOYER'),
+            roleTitle: currentUser.roleTitle || (isSuperAdmin ? 'Super Admin & Owner' : 'Platform Deployer'),
+            isSuperAdmin: isSuperAdmin,
+            isYou: true,
+            status: 'Active',
+            lastActive: 'Just now',
+            avatar: currentUser.avatar || '/avatar.jpg',
+          })
+        }
+
+        if (isMounted) setUsers(items)
       } catch (err) {
         console.error('Failed to fetch users:', err)
-        if (isMounted) setUsers([])
+        // Fallback to local stored members
+        const localOnboarded = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
+        const items = []
+        if (currentUser) {
+          items.push({
+            id: currentUser.id || 'usr_current',
+            name: currentUser.name || 'Alex Mercer',
+            email: currentUser.email || 'alex@company.internal',
+            role: currentUser.role || (isSuperAdmin ? 'SUPER_ADMIN' : 'DEPLOYER'),
+            roleTitle: currentUser.roleTitle || (isSuperAdmin ? 'Super Admin & Owner' : 'Platform Deployer'),
+            isSuperAdmin: isSuperAdmin,
+            isYou: true,
+            status: 'Active',
+            lastActive: 'Just now',
+            avatar: currentUser.avatar || '/avatar.jpg',
+          })
+        }
+        items.push(...localOnboarded)
+        if (isMounted) setUsers(items)
       } finally {
         if (isMounted) setLoading(false)
       }
@@ -64,48 +120,52 @@ export function UsersView() {
     return () => {
       isMounted = false
     }
-  }, [currentUser])
+  }, [currentUser, isSuperAdmin])
 
   const handleAddUser = async (newUser) => {
-    try {
-      const res = await api('/users', {
-        method: 'POST',
-        body: {
-          name: newUser.name,
-          email: newUser.email.toLowerCase().trim(),
-          role: newUser.role.toUpperCase(),
-        },
-      })
-      if (res?.user && res?.temporaryPassword) {
-        setUsers((prev) => [
-          {
-            ...res.user,
-            roleTitle: newUser.roleTitle,
-            isYou: false,
-            status: 'Invited',
-            lastActive: 'Just now',
-          },
-          ...prev,
-        ])
-        setTempPasswordModal({
-          isOpen: true,
-          password: res.temporaryPassword,
-          userEmail: newUser.email,
-        })
-        return
-      }
-    } catch (err) {
-      console.warn('API /users error, falling back to simulated generation:', err)
+    const origin = window.location.origin
+    const token = `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
+    const org = organizationName || 'Engineering'
+    const inviteLink = `${origin}/accept-invite?token=${token}&email=${encodeURIComponent(newUser.email)}&role=${encodeURIComponent(newUser.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Super Admin')}`
+
+    const enrichedUser = {
+      ...newUser,
+      inviteToken: token,
+      inviteLink,
+      invitedBy: currentUser?.name || 'Super Admin',
+      status: 'Invited',
+      lastActive: 'Just now',
+      canResend: true,
     }
 
-    // Dev fallback: generate secure one-time password
+    // Persist to local onboarded list
+    const existing = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
+    localStorage.setItem('deploy_portal_onboarded_members', JSON.stringify([enrichedUser, ...existing]))
+
+    setUsers((prev) => [enrichedUser, ...prev])
+
     const mockTempPassword = `tmp_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 6).toUpperCase()}!`
-    setUsers((prev) => [newUser, ...prev])
     setTempPasswordModal({
       isOpen: true,
       password: mockTempPassword,
       userEmail: newUser.email,
+      inviteLink,
     })
+  }
+
+  const handleCopyGeneralInvite = () => {
+    const org = organizationName || 'Engineering'
+    const origin = window.location.origin
+    const link = `${origin}/accept-invite?org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Super Admin')}`
+    navigator.clipboard?.writeText(link)
+    setCopiedGeneralInvite(true)
+    setTimeout(() => setCopiedGeneralInvite(false), 2000)
+  }
+
+  const handleCopyMemberLink = (link, id) => {
+    navigator.clipboard?.writeText(link)
+    setCopiedMemberId(id)
+    setTimeout(() => setCopiedMemberId(null), 2000)
   }
 
   const handleResendInvite = (email) => {
@@ -113,27 +173,31 @@ export function UsersView() {
   }
 
   const filteredUsers = users.filter((u) => {
-    const matchesSearch =
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.roleTitle.toLowerCase().includes(searchQuery.toLowerCase())
+    const nameMatch = (u.name || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const emailMatch = (u.email || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const titleMatch = (u.roleTitle || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = nameMatch || emailMatch || titleMatch
 
+    const normalizedRole = (u.role || '').toUpperCase()
     const matchesRole =
-      roleFilter === 'All Roles' || u.role.toLowerCase() === roleFilter.toLowerCase()
+      roleFilter === 'All Roles' ||
+      normalizedRole === roleFilter.toUpperCase() ||
+      (roleFilter === 'Admin' && (normalizedRole === 'ADMIN' || normalizedRole === 'SUPER_ADMIN'))
 
     const matchesStatus =
       statusFilter === 'All Statuses' ||
-      u.status.toLowerCase() === statusFilter.toLowerCase()
+      (u.status || '').toLowerCase() === statusFilter.toLowerCase()
 
     const matchesTab =
       activeTab === 'All' ||
-      (activeTab === 'Admins' && u.role === 'Admin') ||
-      (activeTab === 'Deployers' && u.role === 'Deployer') ||
-      (activeTab === 'Viewers' && u.role === 'Viewer') ||
+      (activeTab === 'Admins' && (normalizedRole === 'ADMIN' || normalizedRole === 'SUPER_ADMIN')) ||
+      (activeTab === 'Deployers' && normalizedRole === 'DEPLOYER') ||
+      (activeTab === 'Viewers' && normalizedRole === 'VIEWER') ||
       (activeTab === 'Pending Invites' && u.status === 'Invited')
 
     return matchesSearch && matchesRole && matchesStatus && matchesTab
   })
+
 
   return (
     <div className="space-y-6">
@@ -207,22 +271,67 @@ export function UsersView() {
                 className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer"
               >
                 <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
-                <span>Invite user</span>
+                <span>+ Onboard Colleague</span>
               </button>
             )}
           </div>
         </div>
       </div>
 
+      {/* Super Admin Workspace & Onboarding Banner */}
+      {isSuperAdmin && (
+        <div className="p-4 bg-gradient-to-r from-[#17202A] to-[#1F2C38] border border-[#24313E] rounded-[8px] text-white flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-[6px] bg-[#FAF3E7]/15 border border-[#F1D6A4]/30 flex items-center justify-center shrink-0 text-[#E5C07B]">
+              <Crown className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-[15px] tracking-tight text-white">
+                  {organizationName || 'Engineering Organization'}
+                </span>
+                <span className="px-2 py-0.2 rounded-full bg-[#FAF3E7] text-[#B87E0C] text-[10px] font-bold uppercase font-mono tracking-wider">
+                  Super Admin Control
+                </span>
+              </div>
+              <p className="text-[12px] text-[#8F9CA7] mt-0.5 max-w-xl">
+                As the primary workspace owner, you can onboard new engineers, assign permissions, and share one-time activation links.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyGeneralInvite}
+              className="h-[34px] px-3 rounded-[6px] bg-[#141B22] hover:bg-[#1D2733] border border-[#24313E] text-[#85D3DA] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Copy shareable workspace invite link"
+            >
+              {copiedGeneralInvite ? <Check className="w-3.5 h-3.5 text-[#2E8B57]" /> : <Copy className="w-3.5 h-3.5" />}
+              <span>{copiedGeneralInvite ? 'Invite Copied!' : 'Copy Invite Link'}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsInviteModalOpen(true)}
+              className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            >
+              <UserPlus className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>+ Onboard Team Member</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 2. Filter Tabs & Live Sync */}
       <div className="flex items-center justify-between border-b border-[#E2E7E4] pb-2">
         <div className="flex items-center gap-1">
           {[
-            { id: 'All', label: 'All', count: 14 },
-            { id: 'Admins', label: 'Admins', count: 3 },
-            { id: 'Deployers', label: 'Deployers', count: 8 },
-            { id: 'Viewers', label: 'Viewers', count: 3 },
-            { id: 'Pending Invites', label: 'Pending Invites', count: 2 },
+            { id: 'All', label: 'All', count: users.length },
+            { id: 'Admins', label: 'Admins', count: users.filter((u) => (u.role || '').toUpperCase().includes('ADMIN') || u.isSuperAdmin).length },
+            { id: 'Deployers', label: 'Deployers', count: users.filter((u) => (u.role || '').toUpperCase() === 'DEPLOYER').length },
+            { id: 'Viewers', label: 'Viewers', count: users.filter((u) => (u.role || '').toUpperCase() === 'VIEWER').length },
+            { id: 'Pending Invites', label: 'Pending Invites', count: users.filter((u) => u.status === 'Invited').length },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -268,7 +377,7 @@ export function UsersView() {
                     <th className="py-2.5 px-4">EMAIL</th>
                     <th className="py-2.5 px-4">ROLE</th>
                     <th className="py-2.5 px-4">STATUS</th>
-                    <th className="py-2.5 px-5 text-right">LAST ACTIVE</th>
+                    <th className="py-2.5 px-5 text-right">ACTIONS / LAST ACTIVE</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E2E7E4] text-[12px]">
@@ -287,7 +396,7 @@ export function UsersView() {
                             <div
                               className={`w-8 h-8 rounded-full ${u.bg || 'bg-[#565f6b]'} text-white font-mono font-semibold text-[11px] flex items-center justify-center shrink-0`}
                             >
-                              {u.initials}
+                              {u.initials || (u.name ? u.name.slice(0, 2).toUpperCase() : 'U')}
                             </div>
                           )}
 
@@ -301,9 +410,14 @@ export function UsersView() {
                                   YOU
                                 </span>
                               )}
+                              {(u.role === 'SUPER_ADMIN' || u.isSuperAdmin) && (
+                                <span className="px-1.5 py-0.2 rounded-[3px] bg-[#FAF3E7] text-[#B87E0C] font-mono text-[9px] font-bold border border-[#F1D6A4]">
+                                  OWNER
+                                </span>
+                              )}
                             </div>
                             <div className="text-[11px] text-[#565f6b]">
-                              {u.roleTitle}
+                              {u.roleTitle || (u.isSuperAdmin ? 'Super Admin & Owner' : u.role)}
                             </div>
                           </div>
                         </div>
@@ -318,18 +432,24 @@ export function UsersView() {
 
                       {/* Role */}
                       <td className="py-3 px-4">
-                        {u.role === 'Admin' && (
+                        {(u.role === 'SUPER_ADMIN' || u.role === 'Super Admin' || u.isSuperAdmin) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#FAF3E7] border border-[#F1D6A4] font-mono text-[11px] font-bold text-[#B87E0C]">
+                            <Crown className="w-3 h-3 text-[#B87E0C]" />
+                            <span>Super Admin</span>
+                          </span>
+                        )}
+                        {((u.role === 'Admin' || u.role === 'ADMIN') && !u.isSuperAdmin) && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#E2F0FD] border border-[#BEDDF7] font-mono text-[11px] font-semibold text-[#005459]">
                             <Shield className="w-3 h-3" />
                             <span>Admin</span>
                           </span>
                         )}
-                        {u.role === 'Deployer' && (
+                        {(u.role === 'Deployer' || u.role === 'DEPLOYER') && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#F4F6F5] border border-[#CDD4D0] font-mono text-[11px] font-medium text-[#101d26]">
                             <span>Deployer</span>
                           </span>
                         )}
-                        {u.role === 'Viewer' && (
+                        {(u.role === 'Viewer' || u.role === 'VIEWER') && (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#FAFBFB] border border-[#E2E7E4] font-mono text-[11px] font-medium text-[#565f6b]">
                             <span>Viewer</span>
                           </span>
@@ -358,23 +478,32 @@ export function UsersView() {
                         )}
                       </td>
 
-                      {/* Last Active */}
+                      {/* Actions / Last Active */}
                       <td className="py-3 px-5 text-right font-mono text-[11px] text-[#565f6b]">
-                        <div>{u.lastActive}</div>
-                        {u.subActive && (
-                          <div className="text-[10px] text-[#005459] font-medium">
-                            {u.subActive}
-                          </div>
-                        )}
-                        {u.canResend && (
-                          <button
-                            type="button"
-                            onClick={() => handleResendInvite(u.email)}
-                            className="text-[10px] text-[#005459] hover:underline font-semibold cursor-pointer"
-                          >
-                            Resend
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          {u.status === 'Invited' && u.inviteLink && (
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMemberLink(u.inviteLink, u.id)}
+                              className="h-[24px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#E2F0FD] border border-[#CDD4D0] hover:border-[#005459] text-[10px] text-[#005459] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Copy personalized invite link"
+                            >
+                              {copiedMemberId === u.id ? <Check className="w-3 h-3 text-[#2E8B57]" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedMemberId === u.id ? 'Copied' : 'Invite Link'}</span>
+                            </button>
+                          )}
+
+                          <div>{u.lastActive}</div>
+                          {u.canResend && (
+                            <button
+                              type="button"
+                              onClick={() => handleResendInvite(u.email)}
+                              className="text-[10px] text-[#005459] hover:underline font-semibold cursor-pointer ml-1"
+                            >
+                              Resend
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

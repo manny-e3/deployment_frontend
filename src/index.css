@@ -1,42 +1,53 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  --color-canvas: #EDF0EE;
+  /* Industrial Monochrome Palette */
+  --color-canvas: #FAFAFA;
   --color-surface: #FFFFFF;
-  --color-surface-inset: #F4F6F5;
-  --color-sidebar: #17202A;
-  --color-sidebar-active: #24313E;
-  --color-sidebar-muted: #8F9CA7;
+  --color-surface-inset: #F4F4F5;
+  --color-sidebar: #09090B;
+  --color-sidebar-active: #18181B;
+  --color-sidebar-muted: #71717A;
   
-  --color-border: #CDD4D0;
-  --color-border-subdued: #E2E7E4;
+  /* Precision 1px Hairline Borders */
+  --color-border: #E4E4E7;
+  --color-border-subdued: #F4F4F5;
   
-  --color-text-primary: #17202A;
-  --color-text-secondary: #5E6B76;
-  --color-text-muted: #8F9CA7;
+  /* High-Contrast Technical Readability */
+  --color-text-primary: #09090B;
+  --color-text-secondary: #52525B;
+  --color-text-muted: #71717A;
   
-  --color-primary: #0F6E74;
-  --color-primary-hover: #0B5459;
-  --color-primary-active: #083F43;
+  /* Authoritative Monochromatic Action (Pitch Black Core) */
+  --color-primary: #18181B;
+  --color-primary-hover: #27272A;
+  --color-primary-active: #09090B;
   
-  --color-status-success: #2E8B57;
-  --color-status-success-bg: #EAF5EE;
-  --color-status-success-border: #B8E0C5;
+  /* Functional Operational States */
+  --color-status-success: #16A34A;
+  --color-status-success-bg: #F0FDF4;
+  --color-status-success-border: #BBF7D0;
 
-  --color-status-running: #B87E0C;
-  --color-status-running-bg: #FAF3E7;
-  --color-status-running-border: #F1D6A4;
+  --color-status-running: #D97706;
+  --color-status-running-bg: #FFFBEB;
+  --color-status-running-border: #FDE68A;
 
-  --color-status-failed: #C2412D;
-  --color-status-failed-bg: #FAEBE9;
-  --color-status-failed-border: #F1B5AC;
+  --color-status-failed: #DC2626;
+  --color-status-failed-bg: #FEF2F2;
+  --color-status-failed-border: #FECACA;
 }
 
 :root {
   color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
 }
 
 * {
@@ -46,78 +57,229 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background-color: #EDF0EE;
-  color: #17202A;
+  background-color: #FAFAFA;
+  color: #09090B;
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
-/* Custom scrollbars for high technical density */
+/* Ensure tabular numbers for monospace technical data */
+code, pre, .font-mono, [class*="font-mono"] {
+  font-feature-settings: "tnum" 1, "zero" 1;
+}
+
+/* Precision scrollbars */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: #EDF0EE;
+  background: #F4F4F5;
 }
 ::-webkit-scrollbar-thumb {
-  background: #CDD4D0;
-  border-radius: 3px;
+  background: #D4D4D8;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #B0B9B3;
+  background: #A1A1AA;
 }
 
-/* Terminal custom scrollbar */
+/* Dark Terminal scrollbar */
 .terminal-scroll::-webkit-scrollbar-track {
-  background: #11161B;
+  background: #09090B;
 }
 .terminal-scroll::-webkit-scrollbar-thumb {
-  background: #24313E;
-  border-radius: 3px;
+  background: #27272A;
+  border-radius: 2px;
 }
 .terminal-scroll::-webkit-scrollbar-thumb:hover {
-  background: #3A4B5C;
+  background: #3F3F46;
+}
+
+/* Light mode normalize overrides */
+html:not(.dark) [class*="bg-[#EDF0EE]"] {
+  background-color: #FAFAFA !important;
+}
+html:not(.dark) [class*="border-[#CDD4D0]"] {
+  border-color: #E4E4E7 !important;
+}
+html:not(.dark) [class*="border-[#E2E7E4]"] {
+  border-color: #F4F4F5 !important;
+}
+html:not(.dark) [class*="bg-[#F4F6F5]"] {
+  background-color: #F4F4F5 !important;
+}
+
+/* ==========================================================================
+   Comprehensive Dark Mode Engine (Slipway Obsidian Architecture)
+   ========================================================================== */
+html.dark body {
+  background-color: #07090D !important;
+  color: #F1F5F9 !important;
+}
+
+/* 1. Main Background Canvases */
+html.dark [class*="bg-[#FAFAFA]"],
+html.dark [class*="bg-[#F8FAFC]"],
+html.dark [class*="bg-[#EDF0EE]"],
+html.dark [class*="bg-zinc-50"],
+html.dark [class*="bg-slate-50"],
+html.dark [class*="bg-gray-50"] {
+  background-color: #07090D !important;
+}
+
+/* 2. Elevated Surfaces, Cards, and Containers */
+html.dark .bg-white,
+html.dark [class*="bg-white"]:not([class*="text-"]):not([class*="border-"]),
+html.dark [class*="bg-[#FFFFFF]"],
+html.dark [class*="bg-[#ffffff]"] {
+  background-color: #0E131B !important;
+}
+
+/* 3. Subdued / Inset / Table Header Backgrounds */
+html.dark [class*="bg-[#F4F6F5]"],
+html.dark [class*="bg-[#F4F4F5]"],
+html.dark [class*="bg-zinc-100"],
+html.dark [class*="bg-slate-100"],
+html.dark [class*="bg-gray-100"],
+html.dark [class*="bg-[#FAFBFB]"],
+html.dark [class*="bg-zinc-50/50"] {
+  background-color: #121822 !important;
+}
+
+/* 4. Precision Hairline Borders */
+html.dark [class*="border-[#CDD4D0]"],
+html.dark [class*="border-[#E2E7E4]"],
+html.dark [class*="border-[#EAEFEA]"],
+html.dark [class*="border-zinc-200"],
+html.dark [class*="border-zinc-100"],
+html.dark [class*="border-slate-200"],
+html.dark [class*="border-slate-100"],
+html.dark [class*="border-gray-200"],
+html.dark [class*="divide-zinc-200"],
+html.dark [class*="divide-slate-200"] {
+  border-color: #1A222D !important;
+}
+
+/* 5. Headings and Primary Technical Text */
+html.dark [class*="text-[#101d26]"],
+html.dark [class*="text-[#17202A]"],
+html.dark [class*="text-zinc-950"],
+html.dark [class*="text-zinc-900"],
+html.dark [class*="text-slate-900"],
+html.dark [class*="text-gray-900"] {
+  color: #F8FAFC !important;
+}
+
+/* 6. Secondary & Muted Technical Text */
+html.dark [class*="text-[#565f6b]"],
+html.dark [class*="text-[#5E6B76]"],
+html.dark [class*="text-zinc-600"],
+html.dark [class*="text-zinc-500"],
+html.dark [class*="text-slate-600"],
+html.dark [class*="text-slate-500"],
+html.dark [class*="text-gray-600"],
+html.dark [class*="text-gray-500"] {
+  color: #94A3B8 !important;
+}
+
+/* 7. Subdued / Tertiary Text */
+html.dark [class*="text-[#8F9CA7]"],
+html.dark [class*="text-zinc-400"],
+html.dark [class*="text-slate-400"],
+html.dark [class*="text-gray-400"] {
+  color: #64748B !important;
+}
+
+/* 8. Input Fields, Selects, and Textareas */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+html.dark select,
+html.dark textarea {
+  background-color: #090E15 !important;
+  border-color: #1C2634 !important;
+  color: #F8FAFC !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #475569 !important;
+}
+
+/* 9. Tables */
+html.dark thead,
+html.dark thead tr,
+html.dark th {
+  background-color: #0E1520 !important;
+  color: #94A3B8 !important;
+  border-color: #1A222D !important;
+}
+
+html.dark tbody tr {
+  border-color: #1A222D !important;
+}
+
+html.dark tbody tr:hover {
+  background-color: #131A24 !important;
+}
+
+/* 10. Modals & Dialogs */
+html.dark [role="dialog"] > div,
+html.dark .modal-content {
+  background-color: #0E131B !important;
+  border-color: #1A222D !important;
+  color: #F8FAFC !important;
+}
+
+/* Scrollbars in Dark Mode */
+html.dark ::-webkit-scrollbar-track {
+  background: #090D14;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #1F2937;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #374151;
 }
 
 /* Typography Utility Classes */
 .text-display-lg {
   font-family: var(--font-sans);
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 600;
-  line-height: 40px;
+  line-height: 38px;
   letter-spacing: -0.02em;
 }
 
 .text-headline-lg {
   font-family: var(--font-sans);
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 600;
-  line-height: 32px;
+  line-height: 30px;
   letter-spacing: -0.015em;
 }
 
 .text-headline-md {
   font-family: var(--font-sans);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 28px;
+  line-height: 26px;
   letter-spacing: -0.01em;
 }
 
 .text-headline-sm {
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  line-height: 24px;
+  line-height: 22px;
 }
 
 .text-body-lg {
   font-family: var(--font-sans);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 22px;
+  line-height: 20px;
 }
 
 .text-body-md {
@@ -136,7 +298,7 @@ body {
 
 .text-label-md {
   font-family: var(--font-sans);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   line-height: 16px;
 }
@@ -152,7 +314,7 @@ body {
 
 .font-code-md {
   font-family: var(--font-mono);
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 400;
   line-height: 18px;
 }
@@ -161,5 +323,5 @@ body {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 500;
-  line-height: 16px;
+  line-height: 15px;
 }

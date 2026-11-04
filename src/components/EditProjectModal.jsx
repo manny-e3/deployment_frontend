@@ -8,6 +8,7 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
   const [defaultBranch, setDefaultBranch] = useState('main')
   const [url, setUrl] = useState('')
   const [autoDeploy, setAutoDeploy] = useState(false)
+  const [framework, setFramework] = useState('react')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
@@ -19,6 +20,15 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
       setDefaultBranch(project.defaultBranch || project.branch || 'main')
       const storedUrl = localStorage.getItem(`project_url_${project.id}`) || project.url || project.projectUrl || ''
       setUrl(storedUrl)
+      const storedFramework =
+        localStorage.getItem(`project_framework_${project.id}`) ||
+        project.framework ||
+        (project.name?.toLowerCase().includes('laravel') || project.repoUrl?.toLowerCase().includes('laravel') || project.repoUrl?.toLowerCase().includes('kensite')
+          ? 'laravel'
+          : project.name?.toLowerCase().includes('node') || project.repoUrl?.toLowerCase().includes('node')
+          ? 'node'
+          : 'react')
+      setFramework(storedFramework)
       setAutoDeploy(project.autoDeploy ?? false)
       setError(null)
       setSuccess(false)
@@ -51,6 +61,10 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
         localStorage.removeItem(`project_url_${project.id}`)
       }
 
+      if (framework) {
+        localStorage.setItem(`project_framework_${project.id}`, framework)
+      }
+
       // Backend project schema strictly expects name, repoUrl, defaultBranch, autoDeploy
       const payload = {
         name: name.trim(),
@@ -66,14 +80,21 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
 
       setSuccess(true)
       if (onProjectUpdated) {
-        onProjectUpdated({ ...(updated || project), ...payload, url: url.trim() || null })
+        onProjectUpdated({ ...(updated || project), ...payload, framework, url: url.trim() || null })
       }
       setTimeout(() => {
         onClose()
       }, 500)
     } catch (err) {
       console.error('Failed to update project:', err)
-      setError(err.message || 'Failed to update project. Please check your inputs.')
+      if (err.details?.fields && Array.isArray(err.details.fields)) {
+        const fieldMsgs = err.details.fields
+          .map((f) => `${f.field.replace(/^(body|query|params)\./, '')}: ${f.message}`)
+          .join(', ')
+        setError(fieldMsgs || err.message || 'Failed to update project.')
+      } else {
+        setError(err.message || 'Failed to update project. Please check your inputs.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -132,6 +153,26 @@ export function EditProjectModal({ isOpen, onClose, project, onProjectUpdated })
               className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
               required
             />
+          </div>
+
+          {/* Project Framework */}
+          <div>
+            <label className="block text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b] mb-1">
+              PROJECT FRAMEWORK / ARCHITECTURE
+            </label>
+            <select
+              value={framework}
+              onChange={(e) => setFramework(e.target.value)}
+              className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
+            >
+              <option value="react">React.js / Vite SPA (Single Page App)</option>
+              <option value="laravel">Laravel / PHP (Fullstack &amp; Migrations)</option>
+              <option value="node">Node.js / Express (Backend Service)</option>
+              <option value="custom">Custom / Static (Universal)</option>
+            </select>
+            <p className="text-[11px] text-[#565f6b] mt-1">
+              Adapts environment variables, database management, and deployment scripts to match your tech stack.
+            </p>
           </div>
 
           {/* Repo URL */}

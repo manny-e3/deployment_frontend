@@ -16,6 +16,7 @@ export function RunningNowCard({
   activeDeploy,
   onViewLog,
   onQuickDeploy,
+  hideWhenIdle = false,
 }) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
 
@@ -38,6 +39,8 @@ export function RunningNowCard({
   }, [activeDeploy])
 
   if (!activeDeploy) {
+    if (hideWhenIdle) return null
+
     return (
       <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[10px] p-4.5 shadow-2xs space-y-3.5">
         {/* Card Header */}

@@ -30,7 +30,16 @@ import {
   Activity,
   ShieldAlert,
   Wrench,
-  HeartPulse
+  HeartPulse,
+  Layers,
+  Cpu,
+  Database,
+  ChevronDown,
+  ChevronUp,
+  Search,
+  Filter,
+  Sparkles,
+  X
 } from 'lucide-react'
 import { api } from '../services/api'
 import { watchDeploy } from '../services/socket'
@@ -45,6 +54,16 @@ import { EditTargetModal } from '../components/EditTargetModal'
 import { RollbackModal } from '../components/RollbackModal'
 import { PipelineStepper } from '../components/PipelineStepper'
 import { ApprovalModal } from '../components/ApprovalModal'
+import { CommitDiffModal } from '../components/CommitDiffModal'
+import { MaintenanceModeModal } from '../components/MaintenanceModeModal'
+import { PromotionPipelineBoard } from '../components/PromotionPipelineBoard'
+import { GuardrailsPreflightModal } from '../components/GuardrailsPreflightModal'
+import { HostResourceTelemetry } from '../components/HostResourceTelemetry'
+import { DatabaseMigrationsCard } from '../components/DatabaseMigrationsCard'
+import { PreviewEnvironmentsManager } from '../components/PreviewEnvironmentsManager'
+import { ProjectHeroCard } from '../components/ProjectHeroCard'
+import { checkFreezeStatus } from '../utils/freezeWindows'
+import { evaluateGuardrails, getGuardrailPolicies } from '../utils/policyGuardrails'
 
 export function ProjectDetailView() {
   const { projectId } = useParams()
@@ -80,6 +99,31 @@ export function ProjectDetailView() {
     })
     return map
   }, [projectDeployments])
+
+  // Derive project framework type based on explicit setting, stored preference, or repo/target inference
+  const currentFramework = useMemo(() => {
+    if (project?.framework) return project.framework
+    const saved = localStorage.getItem(`project_framework_${projectId}`)
+    if (saved) return saved
+    if (location.state?.framework) return location.state.framework
+    const str = `${project?.name || ''} ${project?.repoUrl || ''}`.toLowerCase()
+    if (str.includes('laravel') || str.includes('kensite')) return 'laravel'
+    if (str.includes('node') || str.includes('express')) return 'node'
+    if (servers.some((s) => s.postDeploy?.includes('artisan') || s.framework === 'laravel')) return 'laravel'
+    if (servers.some((s) => s.postDeploy?.includes('pm2') || s.framework === 'node')) return 'node'
+    return 'react'
+  }, [project, projectId, location.state, servers])
+
+  const isDatabaseSupported = currentFramework === 'laravel' || currentFramework === 'node'
+  const isArtisanSupported = currentFramework === 'laravel'
+
+  // Automatically fall back from Database tab if current framework does not support databases
+  useEffect(() => {
+    if (activeTab === 'Database' && !isDatabaseSupported) {
+      setActiveTab('Servers')
+    }
+  }, [activeTab, isDatabaseSupported])
+
   const [copiedLog, setCopiedLog] = useState(false)
   const [deploying, setDeploying] = useState(false)
   const [deployError, setDeployError] = useState(null)
@@ -87,19 +131,116 @@ export function ProjectDetailView() {
   const [exitCode, setExitCode] = useState(0)
   const [activeDeployment, setActiveDeployment] = useState(null)
   const [logs, setLogs] = useState([])
+  const [isConsoleCollapsed, setIsConsoleCollapsed] = useState(false)
+  const [isConsoleDismissed, setIsConsoleDismissed] = useState(false)
+  const [logFilterMode, setLogFilterMode] = useState('clean') // 'clean' | 'all' | 'errors'
+  const [logSearch, setLogSearch] = useState('')
+
+  // Clean, filter, and sanitize log output to eliminate SSH server noise and false error alarms
+  const cleanedLogs = useMemo(() => {
+    const parsed = logs.map((l, idx) => {
+      let raw = String(l.line || l.text || '')
+      // Strip ANSI color and cursor codes (e.g. \u001b[0m, [0;35m, etc.)
+      let clean = raw
+        .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+        .replace(/\[\d*(?:;\d+)*m/g, '')
+        .replace(/undefined$/, '')
+        .trimEnd()
+
+      let stream = l.stream || 'STDOUT'
+
+      // Detect harmless git progress lines emitted on stderr
+      const isGitProgress =
+        stream === 'STDERR' &&
+        (clean.startsWith('From ') ||
+          clean.startsWith('* branch') ||
+          clean.startsWith('* [new') ||
+          clean.startsWith('remote:') ||
+          clean.startsWith('Receiving objects') ||
+          clean.startsWith('Resolving deltas') ||
+          clean.startsWith('Cloning into') ||
+          clean.startsWith('Updating ') ||
+          clean.includes('FETCH_HEAD'))
+
+      if (isGitProgress) {
+        stream = 'GIT'
+      }
+
+      const lower = clean.toLowerCase()
+      const isError =
+        stream === 'STDERR' &&
+        !isGitProgress &&
+        (lower.includes('error') || lower.includes('fatal') || lower.includes('failed') || lower.includes('exception') || lower.includes('err!'))
+
+      const isHostingerNoise =
+        lower.includes('welcome back') ||
+        lower.includes('the time now is') ||
+        lower.includes('server load:') ||
+        lower.includes('link to hpanel') ||
+        lower.includes('hpanel.hostinger.com') ||
+        lower.includes('last login:') ||
+        /^[hH\s]{4,}$/.test(clean.trim()) ||
+        clean.trim() === 'undefined'
+
+      return {
+        ...l,
+        originalIndex: idx,
+        clean,
+        stream,
+        isGitProgress,
+        isError,
+        isHostingerNoise,
+        isEmpty: clean.trim().length === 0,
+      }
+    })
+
+    return parsed.filter((item) => {
+      if (logFilterMode === 'clean') {
+        if (item.isEmpty) return false
+        if (item.isHostingerNoise) return false
+      }
+      if (logFilterMode === 'errors') {
+        if (!item.isError && item.stream !== 'STDERR') return false
+      }
+      if (logSearch.trim()) {
+        return item.clean.toLowerCase().includes(logSearch.toLowerCase().trim())
+      }
+      return true
+    })
+  }, [logs, logFilterMode, logSearch])
+
+  const trueErrorCount = useMemo(() => {
+    return logs.filter((l) => {
+      const text = String(l.line || l.text || '').toLowerCase()
+      return l.stream === 'STDERR' && !text.startsWith('from ') && !text.startsWith('* branch') && (text.includes('error') || text.includes('fatal') || text.includes('failed'))
+    }).length
+  }, [logs])
+
   const [loading, setLoading] = useState(true)
   const [isAddTargetOpen, setIsAddTargetOpen] = useState(false)
   const [editingTarget, setEditingTarget] = useState(null)
   const [rollbackDeployment, setRollbackDeployment] = useState(null)
   const [isEditOpen, setIsEditOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
+  const [diffModalTarget, setDiffModalTarget] = useState(null)
+  const [maintenanceModalTarget, setMaintenanceModalTarget] = useState(null)
+  const [preflightTarget, setPreflightTarget] = useState(null)
+  const [preflightEvaluation, setPreflightEvaluation] = useState(null)
 
   // Settings tab form state
   const [settingName, setSettingName] = useState('')
   const [settingRepoUrl, setSettingRepoUrl] = useState('')
   const [settingBranch, setSettingBranch] = useState('main')
   const [settingUrl, setSettingUrl] = useState('')
+  const [settingFramework, setSettingFramework] = useState('react')
   const [settingAutoDeploy, setSettingAutoDeploy] = useState(true)
+
+  useEffect(() => {
+    if (currentFramework) {
+      setSettingFramework(currentFramework)
+    }
+  }, [currentFramework])
+
   const [isSavingSettings, setIsSavingSettings] = useState(false)
   const [settingsSuccess, setSettingsSuccess] = useState(null)
   const [settingsError, setSettingsError] = useState(null)
@@ -136,7 +277,7 @@ export function ProjectDetailView() {
               try {
                 const metaStr = localStorage.getItem(`target_meta_${t.id}`)
                 if (metaStr) meta = JSON.parse(metaStr)
-              } catch (_) {}
+              } catch (_) { }
 
               return {
                 id: t.id,
@@ -341,82 +482,138 @@ export function ProjectDetailView() {
             })
             refreshProject()
           } else {
-            // PROBE FAILED! (HTTP 500, ParseError, timeout, etc.)
-            const statusMsg = `HTTP ${probeRes.status || 500} ${probeRes.statusText || 'Internal Server Error'}`
-            setHealthProbeResults((prev) => ({
-              ...prev,
-              [targetObj.id]: { ok: false, latency, status: statusMsg, testedAt: 'Just now', url: probeUrl }
-            }))
-            setLogs((prev) => [
-              ...prev,
-              {
-                seq: (prev[prev.length - 1].seq || prev.length) + 1,
-                time: new Date().toLocaleTimeString(),
-                line: `[STAGE 7/7: HEALTH CHECK] FAILED · ${probeUrl} returned ${statusMsg}!`,
-                stream: 'STDERR'
-              },
-              {
-                seq: (prev[prev.length - 1].seq || prev.length) + 2,
-                time: new Date().toLocaleTimeString(),
-                line: `[PIPELINE FAILURE] Application returned fatal error post-deployment (HTTP ${probeRes.status || 500}).`,
-                stream: 'STDERR'
-              }
-            ])
+            // Check if failure is due to shared hosting blocking direct IP requests
+            const isFallbackRawIp =
+              !targetObj?.healthCheckUrl?.trim() &&
+              !project?.url?.trim() &&
+              /^https?:\/\/\d+\.\d+\.\d+\.\d+(?::\d+)?\/?$/i.test(probeUrl)
+            const isSharedHostingIpBlock = isFallbackRawIp && probeRes.status === 403
 
-            setStreamStatus('FAILED')
-            setExitCode(1)
-            setActiveDeployment((prev) => ({
-              ...prev,
-              status: 'FAILED',
-              duration: finished.durationMs ? `${Math.round(finished.durationMs / 1000)}s` : 'Probe Failed'
-            }))
-            showToast({
-              type: 'error',
-              title: 'Health Check Failed',
-              message: `Target ${targetObj.name} returned ${statusMsg} post-deployment!`
-            })
-
-            // Trigger Automatic Rollback if enabled on target
-            const shouldRollback = targetObj?.autoRollbackOnFailure !== false
-            if (shouldRollback) {
+            if (isSharedHostingIpBlock) {
+              // Direct IP fallback on shared hosting returns 403 Forbidden because virtual host header is absent.
+              // Deployment completed successfully; do not fail deployment or trigger auto-rollback.
+              setHealthProbeResults((prev) => ({
+                ...prev,
+                [targetObj.id]: {
+                  ok: true,
+                  latency,
+                  status: 'HTTP 403 (IP Access Forbidden - Domain Required)',
+                  testedAt: 'Just now',
+                  url: probeUrl,
+                },
+              }))
               setLogs((prev) => [
                 ...prev,
                 {
                   seq: (prev[prev.length - 1].seq || prev.length) + 1,
                   time: new Date().toLocaleTimeString(),
-                  line: `[AUTO-ROLLBACK] Auto-rollback safeguard is ENABLED. Dispatched automatic rollback to restore working release...`,
-                  stream: 'SYSTEM'
-                }
+                  line: `[STAGE 7/7: HEALTH CHECK] NOTICE · ${probeUrl} returned HTTP 403 Forbidden (Shared hosting blocks direct IP requests without a domain name).`,
+                  stream: 'STDOUT',
+                },
+                {
+                  seq: (prev[prev.length - 1].seq || prev.length) + 2,
+                  time: new Date().toLocaleTimeString(),
+                  line: `[STAGE 7/7: HEALTH CHECK] VERIFIED · Release activated and symlinked successfully. Configure Project URL or Target Health Check URL to probe your live domain.`,
+                  stream: 'STDOUT',
+                },
+                {
+                  seq: (prev[prev.length - 1].seq || prev.length) + 3,
+                  time: new Date().toLocaleTimeString(),
+                  line: `[PIPELINE COMPLETE] Deployment #${finished.number || finished.id.slice(0, 8)} successfully promoted.`,
+                  stream: 'SYSTEM',
+                },
+              ])
+              setStreamStatus('SUCCESS')
+              setExitCode(0)
+              setActiveDeployment((prev) => ({
+                ...prev,
+                status: 'SUCCESS',
+                duration: finished.durationMs ? `${Math.round(finished.durationMs / 1000)}s` : 'Completed',
+              }))
+              showToast({
+                type: 'success',
+                title: 'Deployment Completed',
+                message: `${targetObj.name}: Release active. Set Project URL in settings to probe live domain.`,
+              })
+              refreshProject()
+            } else {
+              // PROBE FAILED! (HTTP 500, ParseError, timeout, etc.)
+              const statusMsg = `HTTP ${probeRes.status || 500} ${probeRes.statusText || 'Internal Server Error'}`
+              setHealthProbeResults((prev) => ({
+                ...prev,
+                [targetObj.id]: { ok: false, latency, status: statusMsg, testedAt: 'Just now', url: probeUrl },
+              }))
+              setLogs((prev) => [
+                ...prev,
+                {
+                  seq: (prev[prev.length - 1].seq || prev.length) + 1,
+                  time: new Date().toLocaleTimeString(),
+                  line: `[STAGE 7/7: HEALTH CHECK] FAILED · ${probeUrl} returned ${statusMsg}!`,
+                  stream: 'STDERR',
+                },
+                {
+                  seq: (prev[prev.length - 1].seq || prev.length) + 2,
+                  time: new Date().toLocaleTimeString(),
+                  line: `[PIPELINE FAILURE] Application returned fatal error post-deployment (HTTP ${probeRes.status || 500}).`,
+                  stream: 'STDERR',
+                },
               ])
 
-              try {
-                // Find prior successful deployment on this project/target
-                const priorDeploy = projectDeployments.find((d) => d.id !== finished.id && d.status === 'SUCCESS')
-                const deployIdToRollback = priorDeploy?.id || finished.id
-                const rollbackRes = await api(`/deployments/${deployIdToRollback}/rollback`, { method: 'POST' })
-                const startedRollback = rollbackRes?.started?.[0] || rollbackRes
-                if (startedRollback && startedRollback.id) {
-                  handleRollbackSuccess(startedRollback)
-                  showToast({
-                    type: 'warning',
-                    title: 'Auto-Rollback Dispatched',
-                    message: `Health probe failed. Automatically reverting target to release #${startedRollback.number || startedRollback.id.slice(0, 8)}.`
-                  })
-                }
-              } catch (rbErr) {
-                console.error('Auto-rollback dispatch error:', rbErr)
+              setStreamStatus('FAILED')
+              setExitCode(1)
+              setActiveDeployment((prev) => ({
+                ...prev,
+                status: 'FAILED',
+                duration: finished.durationMs ? `${Math.round(finished.durationMs / 1000)}s` : 'Probe Failed',
+              }))
+              showToast({
+                type: 'error',
+                title: 'Health Check Failed',
+                message: `Target ${targetObj.name} returned ${statusMsg} post-deployment!`,
+              })
+
+              // Trigger Automatic Rollback if enabled on target
+              const shouldRollback = targetObj?.autoRollbackOnFailure !== false
+              if (shouldRollback) {
                 setLogs((prev) => [
                   ...prev,
                   {
                     seq: (prev[prev.length - 1].seq || prev.length) + 1,
                     time: new Date().toLocaleTimeString(),
-                    line: `[AUTO-ROLLBACK] Error dispatching automatic rollback: ${rbErr.message}`,
-                    stream: 'STDERR'
-                  }
+                    line: `[AUTO-ROLLBACK] Auto-rollback safeguard is ENABLED. Dispatched automatic rollback to restore working release...`,
+                    stream: 'SYSTEM',
+                  },
                 ])
+
+                try {
+                  // Find prior successful deployment on this project/target
+                  const priorDeploy = projectDeployments.find((d) => d.id !== finished.id && d.status === 'SUCCESS')
+                  const deployIdToRollback = priorDeploy?.id || finished.id
+                  const rollbackRes = await api(`/deployments/${deployIdToRollback}/rollback`, { method: 'POST' })
+                  const startedRollback = rollbackRes?.started?.[0] || rollbackRes
+                  if (startedRollback && startedRollback.id) {
+                    handleRollbackSuccess(startedRollback)
+                    showToast({
+                      type: 'warning',
+                      title: 'Auto-Rollback Dispatched',
+                      message: `Health probe failed. Automatically reverting target to release #${startedRollback.number || startedRollback.id.slice(0, 8)}.`,
+                    })
+                  }
+                } catch (rbErr) {
+                  console.error('Auto-rollback dispatch error:', rbErr)
+                  setLogs((prev) => [
+                    ...prev,
+                    {
+                      seq: (prev[prev.length - 1].seq || prev.length) + 1,
+                      time: new Date().toLocaleTimeString(),
+                      line: `[AUTO-ROLLBACK] Error dispatching automatic rollback: ${rbErr.message}`,
+                      stream: 'STDERR',
+                    },
+                  ])
+                }
               }
+              refreshProject()
             }
-            refreshProject()
           }
         } catch (probeErr) {
           console.error('Health probe execution exception:', probeErr)
@@ -457,8 +654,69 @@ export function ProjectDetailView() {
     URL.revokeObjectURL(url)
   }
 
-  // Real API deployment trigger — NO mock data or fake simulation
-  const handleDeploy = async (targetId = null, approved = false) => {
+  // Step 1: Pre-Deployment Review & Commit Diff Inspection
+  const handleDeploy = async (targetId = null, approved = false, overrideData = null) => {
+    if (!canDeploy) return
+
+    const targetObj = targetId ? servers.find((s) => s.id === targetId) : servers[0]
+    const env = targetObj?.name?.toLowerCase().includes('staging') || targetObj?.name?.toLowerCase().includes('qa')
+      ? 'staging'
+      : 'production'
+
+    const freezeCheck = checkFreezeStatus(env, role)
+    if (freezeCheck.isBlocked && !freezeCheck.canBypass && !overrideData?.emergencyBypass) {
+      showToast({
+        type: 'error',
+        title: 'Deployment Blocked by Change Freeze',
+        message: `${env.toUpperCase()} is under active deployment freeze: "${freezeCheck.freeze.reason}". Releases are locked until ${new Date(freezeCheck.freeze.endsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
+      })
+      return
+    }
+
+    const activeDepId = targetId ? activeDeploymentsByTarget[targetId] : null
+    const activeDep = activeDepId ? projectDeployments.find((d) => d.id === activeDepId) : null
+    const commitSha = activeDep?.commitSha || targetObj?.commitSha || 'HEAD'
+
+    // Policy-as-Code pre-flight guardrails check (unless already overridden)
+    if (!overrideData?.emergencyBypass) {
+      try {
+        const policies = await getGuardrailPolicies()
+        const evalResult = evaluateGuardrails({
+          project,
+          target: targetObj,
+          environment: env,
+          commitSha,
+          author: role,
+          role,
+          policies
+        })
+
+        if (evalResult.hasBlockingViolation) {
+          setPreflightEvaluation(evalResult)
+          setPreflightTarget({ targetId, approved, targetObj, env, commitSha })
+          return
+        }
+      } catch (err) {
+        console.error('Guardrails evaluation error:', err)
+      }
+    }
+
+    // If already approved through approval gate, bypass diff modal and execute immediately
+    if (approved) {
+      executeDeploy(targetId, true)
+      return
+    }
+
+    setDiffModalTarget({
+      targetId,
+      targetName: targetObj?.name || 'All Target Servers',
+      baseSha: activeDep?.commitSha || targetObj?.commitSha || null,
+      targetRef: targetObj?.branch || settingBranch || 'main'
+    })
+  }
+
+  // Step 2: Real API deployment trigger — executed after diff review or approval sign-off
+  const executeDeploy = async (targetId = null, approved = false) => {
     if (!canDeploy) return
 
     // Check if target requires approval gate sign-off
@@ -542,7 +800,27 @@ export function ProjectDetailView() {
     }
     if (target?.url) return target.url
     if (project?.url) return project.url
+
+    // Auto-detect domain and subpath from hosting paths (e.g. /home/.../domains/rekovryltd.com/public_html/demo)
+    const targetPath = target?.path || target?.targetDir || ''
+    const hostingerMatch = targetPath.match(/\/domains\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\/public_html(?:\/(.*?))?(?:\/current)?(?:\/public)?$/i)
+    if (hostingerMatch) {
+      const domain = hostingerMatch[1]
+      const subpath = hostingerMatch[2] ? `/${hostingerMatch[2].replace(/^\/+|\/+$/g, '')}` : ''
+      return `https://${domain}${subpath}`
+    }
+
+    const varWwwMatch = targetPath.match(/\/var\/www\/([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})(?:\/(.*?))?(?:\/current)?(?:\/public)?$/i)
+    if (varWwwMatch) {
+      const domain = varWwwMatch[1]
+      const subpath = varWwwMatch[2] ? `/${varWwwMatch[2].replace(/^\/+|\/+$/g, '')}` : ''
+      return `https://${domain}${subpath}`
+    }
+
     if (target?.host && !['remote', '—', 'localhost', '127.0.0.1'].includes(target.host)) {
+      if (!/^\d+\.\d+\.\d+\.\d+$/.test(target.host)) {
+        return `https://${target.host}`
+      }
       return `http://${target.host}`
     }
     // Fallback to local project host path
@@ -607,22 +885,16 @@ export function ProjectDetailView() {
     }
   }
 
-  // Maintenance Mode Switch
+  // Maintenance Mode Orchestration Modal Trigger
   const handleToggleMaintenanceMode = (target) => {
-    const isCurrentlyMaint = Boolean(maintenanceStatus[target.id])
-    const newStatus = !isCurrentlyMaint
+    setMaintenanceModalTarget(target)
+  }
+
+  const handleSaveMaintenanceStatus = (targetId, statusData) => {
     setMaintenanceStatus((prev) => ({
       ...prev,
-      [target.id]: newStatus
+      [targetId]: statusData
     }))
-
-    showToast({
-      type: newStatus ? 'warning' : 'success',
-      title: newStatus ? 'Maintenance Mode Active' : 'Target Back Live',
-      message: newStatus
-        ? `Enabled maintenance mode on "${target.name}". App responds with HTTP 503.`
-        : `Disabled maintenance mode on "${target.name}". App is serving live traffic.`
-    })
   }
 
   // Real Cancel deployment
@@ -683,6 +955,10 @@ export function ProjectDetailView() {
         localStorage.removeItem(`project_url_${projectId}`)
       }
 
+      if (settingFramework) {
+        localStorage.setItem(`project_framework_${projectId}`, settingFramework)
+      }
+
       // Backend project schema strictly expects name, repoUrl, defaultBranch, autoDeploy
       const payload = {
         name: settingName.trim(),
@@ -694,7 +970,7 @@ export function ProjectDetailView() {
         method: 'PATCH',
         body: payload
       })
-      setProject((prev) => ({ ...prev, ...payload, url: settingUrl.trim() || null }))
+      setProject((prev) => ({ ...prev, ...payload, framework: settingFramework, url: settingUrl.trim() || null }))
       setAutoDeploy(Boolean(settingAutoDeploy))
       setSettingsSuccess('Project settings updated successfully.')
       refreshProject()
@@ -762,112 +1038,32 @@ export function ProjectDetailView() {
         </div>
       </div>
 
-      {/* 2. Project Header Card */}
-      <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] p-6 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-[26px] font-bold text-[#101d26] tracking-tight">
-              {formattedTitle}
-            </h1>
-            <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
-              servers.length > 0
-                ? 'bg-[#EAF5EE] border border-[#B8E0C5] text-[#2E8B57]'
-                : 'bg-[#F4F6F5] border border-[#CDD4D0] text-[#565f6b]'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${servers.length > 0 ? 'bg-[#2E8B57]' : 'bg-[#8F9CA7]'}`} />
-              {servers.length > 0 ? 'Configured' : 'Needs Target Server'}
-            </span>
-          </div>
-
-          {/* Subline Metadata */}
-          <div className="flex flex-wrap items-center gap-4 mt-2 text-[12px] text-[#565f6b] font-mono">
-            <div className="flex items-center gap-1.5 text-[#101d26]">
-              <FolderGit2 className="w-3.5 h-3.5 text-[#8F9CA7]" />
-              <span className="truncate max-w-[320px]">{project?.repoUrl || project?.repo || 'No repository URL'}</span>
-            </div>
-
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#101d26]">
-              <GitBranch className="w-3 h-3 text-[#565f6b]" />
-              <span>{project?.defaultBranch || project?.branch || 'main'}</span>
-            </span>
-
-            <div className="flex items-center gap-1 text-[#565f6b]">
-              <Globe className="w-3.5 h-3.5 text-[#8F9CA7]" />
-              <span>{servers.length > 0 ? `${servers.length} target${servers.length > 1 ? 's' : ''} configured` : 'No targets configured'}</span>
-            </div>
-
-            {project?.url && (
-              <a
-                href={project.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-[#E2F0FD] hover:bg-[#D0E7FC] border border-[#BEDDF7] text-[#005459] text-[11px] font-mono font-medium transition-colors cursor-pointer"
-                title={`Visit Live URL: ${project.url}`}
-              >
-                <Globe className="w-3 h-3 text-[#005459]" />
-                <span>{project.url.replace(/^https?:\/\//, '')}</span>
-                <ExternalLink className="w-2.5 h-2.5" />
-              </a>
-            )}
-          </div>
-        </div>
-
-        {/* Right Action Controls */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Auto-deploy toggle */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-[6px] bg-[#F4F6F5] border border-[#CDD4D0]">
-            <button
-              type="button"
-              onClick={() => setAutoDeploy(!autoDeploy)}
-              className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${
-                autoDeploy ? 'bg-[#005459]' : 'bg-[#CDD4D0]'
-              }`}
-            >
-              <div
-                className={`bg-white w-4 h-4 rounded-full shadow-xs transform transition-transform duration-200 ${
-                  autoDeploy ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
-            <div className="text-[11px] font-medium text-[#101d26] leading-none">
-              <div>Auto-deploy</div>
-              <div className="text-[9px] font-mono uppercase text-[#005459] font-bold">
-                {autoDeploy ? 'ON PUSH' : 'PAUSED'}
-              </div>
-            </div>
-          </div>
-
-          {/* Edit Project */}
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsEditOpen(true)}
-              className="h-[36px] px-3 rounded-[6px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[#101d26] text-[13px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-              title="Edit project details"
-            >
-              <Edit3 className="w-3.5 h-3.5 text-[#565f6b]" />
-              <span>Edit</span>
-            </button>
-          )}
-
-          {/* Deploy to all servers */}
-          {canDeploy && (
-            <button
-              type="button"
-              disabled={deploying || servers.length === 0}
-              onClick={() => handleDeploy(null)}
-              className="h-[36px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] active:bg-[#083F43] text-white text-[13px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer shrink-0 disabled:opacity-50"
-            >
-              {deploying ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Rocket className="w-4 h-4" />
-              )}
-              <span>{deploying ? 'Deploying...' : 'Deploy to all servers'}</span>
-            </button>
-          )}
-        </div>
-      </div>
+      {/* 2. Modern Production Hero Card */}
+      <ProjectHeroCard
+        project={project}
+        projectId={projectId}
+        servers={servers}
+        activeDeployment={activeDeployment}
+        deploying={deploying}
+        autoDeploy={autoDeploy}
+        onToggleAutoDeploy={() => setAutoDeploy(!autoDeploy)}
+        onDeploy={handleDeploy}
+        onOpenRollback={() => {
+          const prior = projectDeployments.find((d) => d.status === 'SUCCESS' && d.id !== activeDeployment?.id)
+          setRollbackDeployment(prior || { id: activeDeployment?.id, project: formattedTitle })
+        }}
+        onOpenEdit={() => setIsEditOpen(true)}
+        onJumpToConsole={() => {
+          setIsConsoleDismissed(false)
+          setIsConsoleCollapsed(false)
+          const el = document.getElementById('deployment-console-view')
+          if (el) el.scrollIntoView({ behavior: 'smooth' })
+        }}
+        canDeploy={canDeploy}
+        canManage={canManage}
+        canRollback={canRollback}
+        currentFramework={currentFramework}
+      />
 
       {/* Deploy Error Notification Banner */}
       {deployError && (
@@ -891,11 +1087,10 @@ export function ProjectDetailView() {
         <button
           type="button"
           onClick={() => setActiveTab('Servers')}
-          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${
-            activeTab === 'Servers'
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Servers'
               ? 'border-[#005459] text-[#005459] font-semibold'
               : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
-          }`}
+            }`}
         >
           <Server className="w-4 h-4" />
           <span>Servers</span>
@@ -907,11 +1102,10 @@ export function ProjectDetailView() {
         <button
           type="button"
           onClick={() => setActiveTab('Deployments')}
-          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${
-            activeTab === 'Deployments'
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Deployments'
               ? 'border-[#005459] text-[#005459] font-semibold'
               : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
-          }`}
+            }`}
         >
           <Clock className="w-4 h-4" />
           <span>Deployments</span>
@@ -923,11 +1117,10 @@ export function ProjectDetailView() {
         <button
           type="button"
           onClick={() => setActiveTab('Environment')}
-          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${
-            activeTab === 'Environment'
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Environment'
               ? 'border-[#005459] text-[#005459] font-semibold'
               : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
-          }`}
+            }`}
         >
           <KeyRound className="w-4 h-4" />
           <span>Environment</span>
@@ -938,12 +1131,65 @@ export function ProjectDetailView() {
 
         <button
           type="button"
-          onClick={() => setActiveTab('Settings')}
+          onClick={() => setActiveTab('Promotion')}
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Promotion'
+              ? 'border-[#005459] text-[#005459] font-semibold'
+              : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
+            }`}
+        >
+          <Layers className="w-4 h-4" />
+          <span>Promotion Pipeline</span>
+          <span className="px-1.5 py-0.2 rounded-full bg-[#EAF5EE] text-[#2E8B57] text-[11px] font-mono font-bold">
+            3 Stages
+          </span>
+        </button>
+
+        {/* <button
+          type="button"
+          onClick={() => setActiveTab('Telemetry')}
           className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${
-            activeTab === 'Settings'
+            activeTab === 'Telemetry'
               ? 'border-[#005459] text-[#005459] font-semibold'
               : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
           }`}
+        >
+          <Cpu className="w-4 h-4" />
+          <span>Host Telemetry</span>
+        </button> */}
+
+        {isDatabaseSupported && (
+          <button
+            type="button"
+            onClick={() => setActiveTab('Database')}
+            className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Database'
+                ? 'border-[#005459] text-[#005459] font-semibold'
+                : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
+              }`}
+          >
+            <Database className="w-4 h-4" />
+            <span>Database &amp; Migrations</span>
+          </button>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Preview Envs')}
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Preview Envs'
+              ? 'border-[#005459] text-[#005459] font-semibold'
+              : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
+            }`}
+        >
+          <Globe className="w-4 h-4" />
+          <span>Preview Envs</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Settings')}
+          className={`pb-3 flex items-center gap-2 cursor-pointer transition-colors border-b-2 ${activeTab === 'Settings'
+              ? 'border-[#005459] text-[#005459] font-semibold'
+              : 'border-transparent text-[#565f6b] hover:text-[#101d26]'
+            }`}
         >
           <Settings className="w-4 h-4" />
           <span>Settings</span>
@@ -951,6 +1197,55 @@ export function ProjectDetailView() {
       </div>
 
       {/* 4. Tab Contents */}
+      {activeTab === 'Promotion' && (
+        <PromotionPipelineBoard
+          project={project}
+          servers={servers}
+          projectDeployments={projectDeployments}
+          activeDeploymentsByTarget={activeDeploymentsByTarget}
+          onDeploySuccess={() => {
+            refreshProject()
+            setActiveTab('Deployments')
+          }}
+          onOpenAddTarget={() => setIsAddTargetOpen(true)}
+        />
+      )}
+
+      {activeTab === 'Telemetry' && (
+        <div className="space-y-4">
+          {servers.length === 0 ? (
+            <div className="p-8 text-center bg-white border border-[#CDD4D0] rounded-[8px] space-y-2">
+              <Cpu className="w-6 h-6 mx-auto text-[#8F9CA7]" />
+              <div className="text-[13px] font-medium text-[#101d26]">No target servers configured</div>
+              <p className="text-[11px] text-[#565f6b]">Add a target server to monitor live host CPU, memory, and container metrics.</p>
+            </div>
+          ) : (
+            servers.map((srv) => (
+              <HostResourceTelemetry
+                key={srv.id}
+                isOpen={true}
+                server={srv}
+                isDrawer={false}
+              />
+            ))
+          )}
+        </div>
+      )}
+
+      {activeTab === 'Database' && (
+        <DatabaseMigrationsCard
+          projectId={project?.id || projectId}
+          projectName={project?.name || 'Project'}
+        />
+      )}
+
+      {activeTab === 'Preview Envs' && (
+        <PreviewEnvironmentsManager
+          projectId={project?.id || projectId}
+          projectName={project?.name || 'Project'}
+          repoUrl={project?.repoUrl || ''}
+        />
+      )}
       {activeTab === 'Servers' && (
         <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] overflow-hidden shadow-xs">
           {/* Table Card Header */}
@@ -1201,20 +1496,37 @@ export function ProjectDetailView() {
                           <button
                             type="button"
                             onClick={() => handleToggleMaintenanceMode(s)}
-                            className={`h-[28px] px-2 rounded-[6px] border text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs ${
-                              maintenanceStatus[s.id]
-                                ? 'bg-[#FAEBE9] border-[#F1B5AC] text-[#C2412D]'
+                            className={`h-[28px] px-2 rounded-[6px] border text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer shadow-2xs ${maintenanceStatus[s.id]
+                                ? 'bg-[#FAEBE9] border-[#F1B5AC] text-[#C2412D] font-bold'
                                 : 'bg-[#FFFFFF] border-[#CDD4D0] hover:bg-[#F4F6F5] text-[#565f6b]'
-                            }`}
+                              }`}
                             title={
                               maintenanceStatus[s.id]
-                                ? 'Maintenance active (HTTP 503). Click to restore live traffic.'
-                                : 'Click to put target into maintenance mode (HTTP 503)'
+                                ? `Maintenance active (HTTP 503). ${typeof maintenanceStatus[s.id] === 'object' && maintenanceStatus[s.id]?.reason ? 'Reason: ' + maintenanceStatus[s.id].reason : ''} Click to configure or restore live.`
+                                : 'Configure maintenance mode & traffic draining (HTTP 503)'
                             }
                           >
                             <Wrench className="w-3 h-3" />
                             <span>{maintenanceStatus[s.id] ? '503 Maint' : 'Live'}</span>
                           </button>
+                          {typeof maintenanceStatus[s.id] === 'object' && maintenanceStatus[s.id]?.bypassToken && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                navigator.clipboard.writeText(`X-Maintenance-Bypass: ${maintenanceStatus[s.id].bypassToken}`)
+                                showToast({
+                                  type: 'info',
+                                  title: 'QA Bypass Copied',
+                                  message: 'Header "X-Maintenance-Bypass" copied to clipboard.'
+                                })
+                              }}
+                              className="h-[28px] px-1.5 rounded-[6px] border border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F4F6F5] text-[#005459] text-[10px] font-mono flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Copy QA bypass header: X-Maintenance-Bypass"
+                            >
+                              <Copy className="w-3 h-3" />
+                              <span>Bypass</span>
+                            </button>
+                          )}
                           {canManage && (
                             <>
                               <button
@@ -1293,10 +1605,9 @@ export function ProjectDetailView() {
                         {d.triggeredBy?.name || d.trigger || 'Operator'}
                       </td>
                       <td className="px-3 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] font-mono text-[11px] font-semibold uppercase ${
-                          d.status === 'SUCCESS' ? 'bg-[#EAF5EE] text-[#2E8B57]' :
-                          d.status === 'FAILED' ? 'bg-[#FAEBE9] text-[#C2412D]' : 'bg-[#FAF3E7] text-[#B87E0C]'
-                        }`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] font-mono text-[11px] font-semibold uppercase ${d.status === 'SUCCESS' ? 'bg-[#EAF5EE] text-[#2E8B57]' :
+                            d.status === 'FAILED' ? 'bg-[#FAEBE9] text-[#C2412D]' : 'bg-[#FAF3E7] text-[#B87E0C]'
+                          }`}>
                           {d.status || 'QUEUED'}
                         </span>
                       </td>
@@ -1371,6 +1682,7 @@ export function ProjectDetailView() {
           projectId={projectId}
           targets={project?.targets?.length ? project.targets : servers}
           canManage={canManage}
+          framework={currentFramework}
           onEnvUpdated={() => refreshProject()}
         />
       )}
@@ -1459,20 +1771,39 @@ export function ProjectDetailView() {
                 </div>
               </div>
 
-              {/* Default Branch */}
-              <div>
-                <label className="block text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b] mb-1">
-                  DEFAULT DEPLOYMENT BRANCH
-                </label>
-                <div className="relative flex items-center">
-                  <GitBranch className="w-3.5 h-3.5 text-[#565f6b] absolute left-3 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={settingBranch}
-                    onChange={(e) => setSettingBranch(e.target.value)}
-                    placeholder="main"
-                    className="w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Default Branch */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b] mb-1">
+                    DEFAULT DEPLOYMENT BRANCH
+                  </label>
+                  <div className="relative flex items-center">
+                    <GitBranch className="w-3.5 h-3.5 text-[#565f6b] absolute left-3 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={settingBranch}
+                      onChange={(e) => setSettingBranch(e.target.value)}
+                      placeholder="main"
+                      className="w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[12px] font-mono text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
+                    />
+                  </div>
+                </div>
+
+                {/* Project Framework */}
+                <div>
+                  <label className="block text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b] mb-1">
+                    PROJECT TYPE / FRAMEWORK
+                  </label>
+                  <select
+                    value={settingFramework}
+                    onChange={(e) => setSettingFramework(e.target.value)}
+                    className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15 cursor-pointer"
+                  >
+                    <option value="react">React.js / Vite SPA (Single Page App)</option>
+                    <option value="laravel">Laravel / PHP (Fullstack &amp; Migrations)</option>
+                    <option value="node">Node.js / Express (Backend Service)</option>
+                    <option value="custom">Custom / Static (Universal)</option>
+                  </select>
                 </div>
               </div>
 
@@ -1507,14 +1838,12 @@ export function ProjectDetailView() {
                 <button
                   type="button"
                   onClick={() => setSettingAutoDeploy(!settingAutoDeploy)}
-                  className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${
-                    settingAutoDeploy ? 'bg-[#005459]' : 'bg-[#CDD4D0]'
-                  }`}
+                  className={`w-9 h-5 flex items-center rounded-full p-0.5 cursor-pointer transition-colors duration-200 ${settingAutoDeploy ? 'bg-[#005459]' : 'bg-[#CDD4D0]'
+                    }`}
                 >
                   <div
-                    className={`bg-white w-4 h-4 rounded-full shadow-xs transform transition-transform duration-200 ${
-                      settingAutoDeploy ? 'translate-x-4' : 'translate-x-0'
-                    }`}
+                    className={`bg-white w-4 h-4 rounded-full shadow-xs transform transition-transform duration-200 ${settingAutoDeploy ? 'translate-x-4' : 'translate-x-0'
+                      }`}
                   />
                 </button>
               </div>
@@ -1620,169 +1949,331 @@ export function ProjectDetailView() {
       )}
 
       {/* 5. Live Terminal Container */}
-      <div id="deployment-console-view" className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] overflow-hidden shadow-xs">
-        {/* Terminal Header Bar */}
-        <div className="px-5 py-3 border-b border-[#E2E7E4] flex flex-wrap items-center justify-between gap-3 text-[12px]">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1.5 font-semibold text-[#101d26]">
-              <span className={`w-2 h-2 rounded-full ${
-                streamStatus === 'RUNNING' ? 'bg-[#B87E0C] animate-pulse' :
-                streamStatus === 'FAILED' ? 'bg-[#C2412D]' :
-                streamStatus === 'SUCCESS' ? 'bg-[#2E8B57]' : 'bg-[#8F9CA7]'
-              }`} />
-              Deployment Console
-            </span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="text-[#565f6b]">Run: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded font-semibold">{activeDeployment?.number ? `#${activeDeployment.number}` : (activeDeployment?.id ? `#${activeDeployment.id.slice(0, 8)}` : '—')}</strong></span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="text-[#565f6b]">Target: <strong className="text-[#101d26] font-medium">{activeDeployment?.targetName || (servers.length > 0 ? servers[0].name : 'All targets')}</strong></span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="text-[#565f6b]">Commit: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded">{activeDeployment?.commitSha || 'HEAD'}</strong></span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="text-[#565f6b]">Trigger: <strong className="text-[#101d26] font-medium">{activeDeployment?.trigger || 'Operator'}</strong></span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="text-[#565f6b] font-mono">⏱ {activeDeployment?.duration || (streamStatus === 'RUNNING' ? 'Running...' : 'Idle')}</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {streamStatus === 'RUNNING' ? (
-              <>
-                <span className="px-2 py-0.5 rounded-[4px] bg-[#FAF3E7] border border-[#F1D6A4] text-[#B87E0C] font-mono text-[11px] font-semibold uppercase animate-pulse flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#B87E0C]" />
-                  RUNNING
+      {!isConsoleDismissed && (
+        <div id="deployment-console-view" className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] overflow-hidden shadow-xs transition-all">
+          {/* Collapsed Bar State */}
+          {isConsoleCollapsed ? (
+            <div className="px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-[12px] bg-[#FAFBFB]">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 font-semibold text-[#101d26]">
+                  <span className={`w-2 h-2 rounded-full ${streamStatus === 'RUNNING' ? 'bg-[#B87E0C] animate-pulse' :
+                      streamStatus === 'FAILED' ? 'bg-[#C2412D]' :
+                        streamStatus === 'SUCCESS' ? 'bg-[#2E8B57]' : 'bg-[#8F9CA7]'
+                    }`} />
+                  Deployment Console
                 </span>
-                {canCancel && (
+                <span className="text-[#8F9CA7]">•</span>
+                <span className="text-[#565f6b]">Run: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded font-semibold">{activeDeployment?.number ? `#${activeDeployment.number}` : (activeDeployment?.id ? `#${activeDeployment.id.slice(0, 8)}` : '—')}</strong></span>
+                <span className="text-[#8F9CA7]">•</span>
+                <span className="text-[#565f6b]">Target: <strong className="text-[#101d26] font-medium">{activeDeployment?.targetName || (servers.length > 0 ? servers[0].name : 'All targets')}</strong></span>
+                <span className="text-[#8F9CA7]">•</span>
+                <span className="text-[#565f6b]">Commit: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded">{activeDeployment?.commitSha || 'HEAD'}</strong></span>
+                <span className="text-[#8F9CA7]">•</span>
+                <span className={`px-2 py-0.2 rounded font-mono text-[10px] font-semibold uppercase ${
+                  streamStatus === 'SUCCESS' ? 'bg-[#EAF5EE] text-[#2E8B57]' :
+                  streamStatus === 'FAILED' ? 'bg-[#FAEBE9] text-[#C2412D]' : 'bg-[#FAF3E7] text-[#B87E0C]'
+                }`}>
+                  {streamStatus}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={downloadRawLogs}
+                  disabled={logs.length === 0}
+                  className="h-[26px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[11px] text-[#101d26] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                  title="Download raw deployment log"
+                >
+                  <FileText className="w-3 h-3 text-[#565f6b]" />
+                  <span>Raw log</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsConsoleCollapsed(false)}
+                  className="h-[26px] px-2.5 rounded-[4px] bg-[#005459] hover:bg-[#0B5459] text-white text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <ChevronUp className="w-3 h-3" />
+                  <span>Expand Console</span>
+                </button>
+                {streamStatus !== 'RUNNING' && (
                   <button
                     type="button"
-                    onClick={handleCancelDeploy}
-                    className="h-[26px] px-2 rounded-[4px] bg-[#FAEBE9] hover:bg-[#F8DFDC] border border-[#F1B5AC] text-[11px] text-[#C2412D] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                    onClick={() => setIsConsoleDismissed(true)}
+                    className="h-[26px] w-[26px] rounded-[4px] text-[#8F9CA7] hover:text-[#101d26] hover:bg-[#F4F6F5] flex items-center justify-center transition-colors cursor-pointer"
+                    title="Dismiss console"
                   >
-                    <Square className="w-3 h-3 fill-current" />
-                    <span>Cancel</span>
+                    <X className="w-3.5 h-3.5" />
                   </button>
                 )}
-              </>
-            ) : streamStatus === 'FAILED' ? (
-              <span className="px-2 py-0.5 rounded-[4px] bg-[#FAEBE9] border border-[#F1B5AC] text-[#C2412D] font-mono text-[11px] font-semibold uppercase">
-                ● FAILED (EXIT {exitCode})
-              </span>
-            ) : streamStatus === 'SUCCESS' ? (
-              <span className="px-2 py-0.5 rounded-[4px] bg-[#EAF5EE] border border-[#B8E0C5] text-[#2E8B57] font-mono text-[11px] font-semibold uppercase">
-                ● SUCCESS
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded-[4px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#565f6b] font-mono text-[11px] font-semibold uppercase">
-                ● IDLE
-              </span>
-            )}
-
-            <button
-              type="button"
-              onClick={downloadRawLogs}
-              disabled={logs.length === 0}
-              className="h-[26px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[11px] text-[#101d26] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
-              title="Download raw deployment log"
-            >
-              <FileText className="w-3 h-3 text-[#565f6b]" />
-              <span>Raw log</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Visual Pipeline Stage Stepper */}
-        <div className="p-3.5 bg-[#131A22] border-t border-[#24313E]">
-          <PipelineStepper
-            status={streamStatus}
-            logs={logs}
-            activeStage={activeStepperStage}
-            onStageClick={(stgId) => setActiveStepperStage(stgId === activeStepperStage ? null : stgId)}
-          />
-        </div>
-
-        {/* Embedded Dark Terminal Window */}
-        <div className="p-4 bg-[#11161B] border-t border-[#24313E] font-mono text-[12px] text-[#D1D7DC]">
-          {/* Terminal Window Header */}
-          <div className="flex items-center justify-between pb-3 border-b border-[#24313E] select-none text-[11px]">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#E06C75]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#E5C07B]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#98C379]" />
               </div>
-              <span className="text-[#8F9CA7] ml-2">&lt;&gt; deploy-stream.log (stdout/stderr)</span>
             </div>
+          ) : (
+            <>
+              {/* Full Terminal Header Bar */}
+              <div className="px-5 py-3 border-b border-[#E2E7E4] flex flex-wrap items-center justify-between gap-3 text-[12px]">
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 font-semibold text-[#101d26]">
+                    <span className={`w-2 h-2 rounded-full ${streamStatus === 'RUNNING' ? 'bg-[#B87E0C] animate-pulse' :
+                        streamStatus === 'FAILED' ? 'bg-[#C2412D]' :
+                          streamStatus === 'SUCCESS' ? 'bg-[#2E8B57]' : 'bg-[#8F9CA7]'
+                      }`} />
+                    Deployment Console
+                  </span>
+                  <span className="text-[#8F9CA7]">•</span>
+                  <span className="text-[#565f6b]">Run: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded font-semibold">{activeDeployment?.number ? `#${activeDeployment.number}` : (activeDeployment?.id ? `#${activeDeployment.id.slice(0, 8)}` : '—')}</strong></span>
+                  <span className="text-[#8F9CA7]">•</span>
+                  <span className="text-[#565f6b]">Target: <strong className="text-[#101d26] font-medium">{activeDeployment?.targetName || (servers.length > 0 ? servers[0].name : 'All targets')}</strong></span>
+                  <span className="text-[#8F9CA7]">•</span>
+                  <span className="text-[#565f6b]">Commit: <strong className="font-mono text-[#005459] bg-[#E2F0FD] px-1 rounded">{activeDeployment?.commitSha || 'HEAD'}</strong></span>
+                  <span className="text-[#8F9CA7]">•</span>
+                  <span className="text-[#565f6b]">Trigger: <strong className="text-[#101d26] font-medium">{activeDeployment?.trigger || 'Operator'}</strong></span>
+                  <span className="text-[#8F9CA7]">•</span>
+                  <span className="text-[#565f6b] font-mono">⏱ {activeDeployment?.duration || (streamStatus === 'RUNNING' ? 'Running...' : 'Idle')}</span>
+                </div>
 
-            <div className="flex items-center gap-2 text-[#8F9CA7]">
-              <span className="px-1.5 py-0.2 rounded bg-[#17202A] border border-[#24313E] text-[10px]">UTF-8</span>
-              <button
-                type="button"
-                onClick={copyLogStream}
-                disabled={logs.length === 0}
-                className="hover:text-white transition-colors cursor-pointer disabled:opacity-40"
-                title="Copy log text"
-              >
-                {copiedLog ? <Check className="w-3.5 h-3.5 text-[#2E8B57]" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-          </div>
-
-          {/* Terminal Log Lines */}
-          <div className="py-3 leading-[20px] space-y-0.5 select-text overflow-x-auto min-h-[140px] max-h-[360px] overflow-y-auto">
-            {logs.length === 0 ? (
-              <div className="py-8 text-center text-[#5E6B76] font-mono text-[12px] flex flex-col items-center justify-center gap-1.5">
-                <Terminal className="w-5 h-5 text-[#3A4754]" />
-                <span>Ready. Realtime stdout/stderr deployment logs will stream here during release runs.</span>
-              </div>
-            ) : (
-              logs.map((line, idx) => {
-                const isStderr = line.stream === 'STDERR'
-                const isSystem = line.stream === 'SYSTEM'
-                return (
-                  <div key={idx} className="flex items-start gap-2 hover:bg-[#17202A]/40 px-1 rounded">
-                    <span className="text-[#5E6B76] select-none shrink-0 text-[11px]">[{line.time}]</span>
-                    {line.stream && (
-                      <span className={`select-none text-[10px] font-bold shrink-0 ${
-                        isStderr ? 'text-[#E06C75]' : isSystem ? 'text-[#85D3DA]' : 'text-[#8F9CA7]'
-                      }`}>
-                        [{line.stream}]
+                <div className="flex items-center gap-2">
+                  {streamStatus === 'RUNNING' ? (
+                    <>
+                      <span className="px-2 py-0.5 rounded-[4px] bg-[#FAF3E7] border border-[#F1D6A4] text-[#B87E0C] font-mono text-[11px] font-semibold uppercase animate-pulse flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#B87E0C]" />
+                        RUNNING
                       </span>
-                    )}
-                    <span className={`break-all whitespace-pre-wrap ${
-                      isStderr ? 'text-[#F1B5AC]' : isSystem ? 'text-[#85D3DA]' : 'text-[#D1D7DC]'
-                    }`}>
-                      {line.line || line.text}
+                      {canCancel && (
+                        <button
+                          type="button"
+                          onClick={handleCancelDeploy}
+                          className="h-[26px] px-2 rounded-[4px] bg-[#FAEBE9] hover:bg-[#F8DFDC] border border-[#F1B5AC] text-[11px] text-[#C2412D] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Square className="w-3 h-3 fill-current" />
+                          <span>Cancel</span>
+                        </button>
+                      )}
+                    </>
+                  ) : streamStatus === 'FAILED' ? (
+                    <span className="px-2 py-0.5 rounded-[4px] bg-[#FAEBE9] border border-[#F1B5AC] text-[#C2412D] font-mono text-[11px] font-semibold uppercase">
+                      ● FAILED (EXIT {exitCode})
+                    </span>
+                  ) : streamStatus === 'SUCCESS' ? (
+                    <span className="px-2 py-0.5 rounded-[4px] bg-[#EAF5EE] border border-[#B8E0C5] text-[#2E8B57] font-mono text-[11px] font-semibold uppercase">
+                      ● SUCCESS
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-[4px] bg-[#F4F6F5] border border-[#CDD4D0] text-[#565f6b] font-mono text-[11px] font-semibold uppercase">
+                      ● IDLE
+                    </span>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={downloadRawLogs}
+                    disabled={logs.length === 0}
+                    className="h-[26px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[11px] text-[#101d26] flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                    title="Download raw deployment log"
+                  >
+                    <FileText className="w-3 h-3 text-[#565f6b]" />
+                    <span>Raw log</span>
+                  </button>
+
+                  {/* Collapse console button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsConsoleCollapsed(true)}
+                    className="h-[26px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[11px] text-[#565f6b] hover:text-[#101d26] flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Minimize deployment console"
+                  >
+                    <ChevronDown className="w-3 h-3" />
+                    <span>Minimize</span>
+                  </button>
+
+                  {streamStatus !== 'RUNNING' && (
+                    <button
+                      type="button"
+                      onClick={() => setIsConsoleDismissed(true)}
+                      className="h-[26px] w-[26px] rounded-[4px] text-[#8F9CA7] hover:text-[#101d26] hover:bg-[#F4F6F5] flex items-center justify-center transition-colors cursor-pointer"
+                      title="Dismiss console"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Visual Pipeline Stage Stepper */}
+              <div className="p-3 bg-[#131A22] border-t border-[#24313E]">
+                <PipelineStepper
+                  status={streamStatus}
+                  logs={logs}
+                  framework={currentFramework}
+                  activeStage={activeStepperStage}
+                  onStageClick={(stgId) => setActiveStepperStage(stgId === activeStepperStage ? null : stgId)}
+                />
+              </div>
+
+              {/* Embedded Dark Terminal Window */}
+              <div className="p-4 bg-[#11161B] border-t border-[#24313E] font-mono text-[12px] text-[#D1D7DC]">
+                {/* Terminal Window Header Bar with View Controls */}
+                <div className="flex flex-wrap items-center justify-between pb-3 border-b border-[#24313E] select-none text-[11px] gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#E06C75]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#E5C07B]" />
+                      <span className="w-2.5 h-2.5 rounded-full bg-[#98C379]" />
+                    </div>
+                    <span className="text-[#8F9CA7] font-semibold">&lt;&gt; deploy-stream.log</span>
+                    <span className="px-1.5 py-0.2 rounded bg-[#17202A] text-[#8F9CA7] text-[10px]">
+                      {cleanedLogs.length} line{cleanedLogs.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                )
-              })
-            )}
-            <div ref={terminalBottomRef} />
-          </div>
 
-          {/* Terminal Status Footer */}
-          <div className="pt-2 border-t border-[#24313E] flex items-center justify-between text-[11px] text-[#8F9CA7] select-none">
-            <span className={`flex items-center gap-1.5 ${
-              streamStatus === 'RUNNING' ? 'text-[#E5C07B]' :
-              streamStatus === 'FAILED' ? 'text-[#E06C75]' :
-              streamStatus === 'SUCCESS' ? 'text-[#7ed99e]' : 'text-[#8F9CA7]'
-            }`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${
-                streamStatus === 'RUNNING' ? 'bg-[#E5C07B] animate-ping' :
-                streamStatus === 'FAILED' ? 'bg-[#E06C75]' :
-                streamStatus === 'SUCCESS' ? 'bg-[#7ed99e]' : 'bg-[#5E6B76]'
-              }`} />
-              {streamStatus === 'RUNNING'
-                ? 'Streaming deployment logs in realtime...'
-                : streamStatus === 'FAILED'
-                ? `Stream ended with error (exit code ${exitCode})`
-                : streamStatus === 'SUCCESS'
-                ? `Stream closed normally with exit code ${exitCode}`
-                : 'Deployment stream idle'}
-            </span>
-            <span className="text-[#5E6B76]">Job ID: {activeDeployment?.id || '—'}</span>
-          </div>
+                  {/* Filter View Selector Pills */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center p-0.5 bg-[#17202A] border border-[#24313E] rounded-[5px]">
+                      <button
+                        type="button"
+                        onClick={() => setLogFilterMode('clean')}
+                        className={`px-2 py-0.5 rounded-[4px] text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                          logFilterMode === 'clean'
+                            ? 'bg-[#005459] text-white font-semibold shadow-2xs'
+                            : 'text-[#8F9CA7] hover:text-[#D1D7DC]'
+                        }`}
+                        title="Filters out SSH MOTD banners and empty lines"
+                      >
+                        <Sparkles className="w-2.5 h-2.5 text-[#85D3DA]" />
+                        <span>Clean View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogFilterMode('all')}
+                        className={`px-2 py-0.5 rounded-[4px] text-[10px] font-medium transition-colors cursor-pointer ${
+                          logFilterMode === 'all'
+                            ? 'bg-[#005459] text-white font-semibold shadow-2xs'
+                            : 'text-[#8F9CA7] hover:text-[#D1D7DC]'
+                        }`}
+                        title="Show full unedited raw SSH stream"
+                      >
+                        <span>All Raw ({logs.length})</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLogFilterMode('errors')}
+                        className={`px-2 py-0.5 rounded-[4px] text-[10px] font-medium transition-colors cursor-pointer flex items-center gap-1 ${
+                          logFilterMode === 'errors'
+                            ? 'bg-[#8E2A2A] text-white font-semibold shadow-2xs'
+                            : 'text-[#8F9CA7] hover:text-[#D1D7DC]'
+                        }`}
+                        title="Show only error lines"
+                      >
+                        <span>Errors {trueErrorCount > 0 ? `(${trueErrorCount})` : ''}</span>
+                      </button>
+                    </div>
+
+                    {/* Search log text input */}
+                    <div className="relative flex items-center">
+                      <Search className="w-3 h-3 text-[#565f6b] absolute left-2 pointer-events-none" />
+                      <input
+                        type="text"
+                        value={logSearch}
+                        onChange={(e) => setLogSearch(e.target.value)}
+                        placeholder="Filter..."
+                        className="h-[24px] pl-6 pr-2 w-[110px] focus:w-[150px] bg-[#17202A] border border-[#24313E] focus:border-[#005459] rounded-[4px] text-[11px] text-[#D1D7DC] outline-none transition-all placeholder:text-[#565f6b]"
+                      />
+                      {logSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setLogSearch('')}
+                          className="absolute right-1 text-[#8F9CA7] hover:text-white"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Copy logs */}
+                    <button
+                      type="button"
+                      onClick={copyLogStream}
+                      disabled={logs.length === 0}
+                      className="h-[24px] px-2 rounded bg-[#17202A] hover:bg-[#202D3A] border border-[#24313E] text-[#8F9CA7] hover:text-white flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-40"
+                      title="Copy log text"
+                    >
+                      {copiedLog ? <Check className="w-3 h-3 text-[#2E8B57]" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Terminal Log Lines */}
+                <div className="py-2.5 leading-[20px] space-y-0.5 select-text overflow-x-auto min-h-[120px] max-h-[320px] overflow-y-auto">
+                  {cleanedLogs.length === 0 ? (
+                    <div className="py-8 text-center text-[#5E6B76] font-mono text-[12px] flex flex-col items-center justify-center gap-1.5">
+                      <Terminal className="w-5 h-5 text-[#3A4754]" />
+                      <span>{logSearch ? 'No log lines matched your search filter.' : 'Ready. Realtime stdout/stderr deployment logs will stream here during release runs.'}</span>
+                    </div>
+                  ) : (
+                    cleanedLogs.map((line, idx) => {
+                      const isStderr = line.stream === 'STDERR'
+                      const isGit = line.stream === 'GIT'
+                      const isSystem = line.stream === 'SYSTEM'
+
+                      return (
+                        <div key={idx} className="flex items-start gap-2 hover:bg-[#17202A]/40 px-1 rounded transition-colors">
+                          <span className="text-[#4E5B66] select-none shrink-0 text-[11px]">[{line.time}]</span>
+                          {line.stream && (
+                            <span className={`select-none text-[10px] font-bold shrink-0 px-1 rounded ${
+                              isStderr
+                                ? 'bg-[#3A1E1E] text-[#E06C75]'
+                                : isGit
+                                ? 'bg-[#162B36] text-[#85D3DA]'
+                                : isSystem
+                                ? 'bg-[#192734] text-[#85D3DA]'
+                                : 'text-[#566573]'
+                            }`}>
+                              [{line.stream}]
+                            </span>
+                          )}
+                          <span className={`break-all whitespace-pre-wrap font-mono ${
+                            isStderr
+                              ? 'text-[#F1B5AC]'
+                              : isGit
+                              ? 'text-[#A0D2DB]'
+                              : isSystem
+                              ? 'text-[#85D3DA]'
+                              : 'text-[#D1D7DC]'
+                          }`}>
+                            {line.clean}
+                          </span>
+                        </div>
+                      )
+                    })
+                  )}
+                  <div ref={terminalBottomRef} />
+                </div>
+
+                {/* Terminal Status Footer */}
+                <div className="pt-2 border-t border-[#24313E] flex items-center justify-between text-[11px] text-[#8F9CA7] select-none">
+                  <span className={`flex items-center gap-1.5 ${streamStatus === 'RUNNING' ? 'text-[#E5C07B]' :
+                      streamStatus === 'FAILED' ? 'text-[#E06C75]' :
+                        streamStatus === 'SUCCESS' ? 'text-[#7ed99e]' : 'text-[#8F9CA7]'
+                    }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${streamStatus === 'RUNNING' ? 'bg-[#E5C07B] animate-ping' :
+                        streamStatus === 'FAILED' ? 'bg-[#E06C75]' :
+                          streamStatus === 'SUCCESS' ? 'bg-[#7ed99e]' : 'bg-[#5E6B76]'
+                      }`} />
+                    {streamStatus === 'RUNNING'
+                      ? 'Streaming deployment logs in realtime...'
+                      : streamStatus === 'FAILED'
+                        ? `Stream ended with error (exit code ${exitCode})`
+                        : streamStatus === 'SUCCESS'
+                          ? `Stream closed normally with exit code ${exitCode}`
+                          : 'Deployment stream idle'}
+                  </span>
+                  <span className="text-[#5E6B76]">Job ID: {activeDeployment?.id || '—'}</span>
+                </div>
+              </div>
+            </>
+          )}
         </div>
-      </div>
+      )}
 
       {/* 6. Link Target Server Modal */}
       <AddTargetModal
@@ -1790,15 +2281,7 @@ export function ProjectDetailView() {
         onClose={() => setIsAddTargetOpen(false)}
         projectId={projectId}
         defaultBranch={project?.defaultBranch || 'main'}
-        projectFramework={
-          location.state?.framework ||
-          localStorage.getItem(`project_framework_${projectId}`) ||
-          (project?.name?.toLowerCase().includes('laravel')
-            ? 'laravel'
-            : project?.name?.toLowerCase().includes('node')
-            ? 'node'
-            : 'react')
-        }
+        projectFramework={currentFramework}
         onTargetAdded={refreshProject}
       />
 
@@ -1870,6 +2353,60 @@ export function ProjectDetailView() {
               message: 'Deployment was cancelled by operator.'
             })
           }}
+        />
+      )}
+
+      {/* 12. Pre-Deployment Commit Diff & Changelog Modal */}
+      {diffModalTarget && (
+        <CommitDiffModal
+          isOpen={Boolean(diffModalTarget)}
+          onClose={() => setDiffModalTarget(null)}
+          onConfirmDeploy={() => {
+            const tId = diffModalTarget.targetId
+            setDiffModalTarget(null)
+            executeDeploy(tId, false)
+          }}
+          projectId={project?.id || projectId}
+          projectName={project?.name || 'Project'}
+          targetName={diffModalTarget.targetName}
+          targetId={diffModalTarget.targetId}
+          baseSha={diffModalTarget.baseSha}
+          targetRef={diffModalTarget.targetRef}
+          recentDeployments={projectDeployments}
+        />
+      )}
+
+      {/* 13. Target Maintenance Mode Orchestration Modal */}
+      {maintenanceModalTarget && (
+        <MaintenanceModeModal
+          isOpen={Boolean(maintenanceModalTarget)}
+          onClose={() => setMaintenanceModalTarget(null)}
+          target={maintenanceModalTarget}
+          projectId={project?.id || projectId}
+          currentStatus={maintenanceStatus[maintenanceModalTarget.id]}
+          onSave={handleSaveMaintenanceStatus}
+        />
+      )}
+
+      {/* 14. Policy Pre-Flight Guardrails Evaluation Modal */}
+      {preflightTarget && (
+        <GuardrailsPreflightModal
+          isOpen={Boolean(preflightTarget)}
+          onClose={() => {
+            setPreflightTarget(null)
+            setPreflightEvaluation(null)
+          }}
+          evaluation={preflightEvaluation}
+          onProceed={(overrideData) => {
+            const savedTarget = preflightTarget
+            setPreflightTarget(null)
+            setPreflightEvaluation(null)
+            handleDeploy(savedTarget.targetId, savedTarget.approved, overrideData)
+          }}
+          project={project}
+          target={preflightTarget.targetObj}
+          environment={preflightTarget.env}
+          commitSha={preflightTarget.commitSha}
         />
       )}
     </div>

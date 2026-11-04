@@ -21,13 +21,39 @@ import {
   Layers,
   Info,
   ArrowRightLeft,
-  GitCompare
+  GitCompare,
+  ChevronDown,
+  Copy,
+  Search
 } from 'lucide-react'
 import { api } from '../services/api'
 
-export function EnvironmentManager({ projectId, targets = [], canManage = true, onEnvUpdated }) {
+export function EnvironmentManager({ projectId, targets = [], canManage = true, onEnvUpdated, framework }) {
   const [selectedTargetId, setSelectedTargetId] = useState(targets[0]?.id || '')
   const [subTab, setSubTab] = useState('env') // 'env' | 'database' | 'artisan' | 'diff'
+  const [showPresetsMenu, setShowPresetsMenu] = useState(false)
+
+  // Resolve framework based on prop, stored preference, or target inference
+  const effectiveFramework = useMemo(() => {
+    if (framework) return framework
+    const saved = localStorage.getItem(`project_framework_${projectId}`)
+    if (saved) return saved
+    if (targets.some((t) => t.postDeploy?.includes('artisan') || t.framework === 'laravel')) return 'laravel'
+    if (targets.some((t) => t.postDeploy?.includes('pm2') || t.framework === 'node')) return 'node'
+    return 'react'
+  }, [framework, projectId, targets])
+
+  const isArtisanSupported = effectiveFramework === 'laravel'
+  const isDatabaseSupported = effectiveFramework === 'laravel' || effectiveFramework === 'node'
+
+  // Automatically switch sub-tab if currently active sub-tab is unsupported for this framework
+  useEffect(() => {
+    if (subTab === 'artisan' && !isArtisanSupported) {
+      setSubTab('env')
+    } else if (subTab === 'database' && !isDatabaseSupported) {
+      setSubTab('env')
+    }
+  }, [subTab, isArtisanSupported, isDatabaseSupported])
   
   // Env editor state
   const [envVars, setEnvVars] = useState([])
@@ -38,6 +64,35 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
   const [savingEnv, setSavingEnv] = useState(false)
   const [envSuccess, setEnvSuccess] = useState(null)
   const [envError, setEnvError] = useState(null)
+  const [filterKeyword, setFilterKeyword] = useState('')
+  const [copiedEnv, setCopiedEnv] = useState(false)
+  const [allMasked, setAllMasked] = useState(true)
+
+  const handleCopyAsEnv = () => {
+    const text = envVars
+      .filter((v) => v.key && v.key.trim())
+      .map((v) => `${v.key.trim()}=${v.value || ''}`)
+      .join('\n')
+    navigator.clipboard?.writeText(text)
+    setCopiedEnv(true)
+    setTimeout(() => setCopiedEnv(false), 2000)
+  }
+
+  const handleToggleMaskAll = () => {
+    if (allMasked) {
+      setHiddenKeys(new Set())
+      setAllMasked(false)
+    } else {
+      setHiddenKeys(new Set(envVars.map((v) => v.id)))
+      setAllMasked(true)
+    }
+  }
+
+  const displayedVars = useMemo(() => {
+    if (!filterKeyword.trim()) return envVars
+    const kw = filterKeyword.toLowerCase().trim()
+    return envVars.filter((v) => v.key.toLowerCase().includes(kw))
+  }, [envVars, filterKeyword])
 
   // SQL Upload state
   const [sqlFile, setSqlFile] = useState(null)
@@ -360,6 +415,30 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
     setEnvSuccess('Populated React (Vite) environment template.')
   }
 
+  // Load Node.js / Express Env Template
+  const loadNodePreset = () => {
+    const template = [
+      { key: 'NODE_ENV', value: 'production' },
+      { key: 'PORT', value: '3000' },
+      { key: 'APP_URL', value: 'https://example.com' },
+      { key: 'DB_HOST', value: '127.0.0.1' },
+      { key: 'DB_PORT', value: '5432' },
+      { key: 'DB_DATABASE', value: 'app_db' },
+      { key: 'DB_USERNAME', value: 'postgres' },
+      { key: 'DB_PASSWORD', value: '' },
+      { key: 'JWT_SECRET', value: 'change_me_super_secret_jwt_key' }
+    ]
+
+    const entries = template.map((t) => ({
+      id: Math.random().toString(36).substring(2, 9),
+      key: t.key,
+      value: t.value
+    }))
+    setEnvVars(entries)
+    setRawEnvText(entries.map((e) => `${e.key}=${e.value}`).join('\n'))
+    setEnvSuccess('Populated Node.js / Express environment template.')
+  }
+
   // Save Environment Variables
   const handleSaveEnv = async () => {
     if (!selectedTargetId) return
@@ -544,7 +623,7 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
           </div>
         </div>
 
-        {/* Sub-tab pills */}
+        {/* Sub-tab pills - dynamically filtered by project framework */}
         <div className="flex items-center gap-1.5 p-1 bg-[#F4F6F5] border border-[#CDD4D0] rounded-[6px]">
           <button
             type="button"
@@ -559,31 +638,35 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
             <span>.env Variables</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setSubTab('database')}
-            className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-              subTab === 'database'
-                ? 'bg-[#FFFFFF] text-[#005459] shadow-2xs font-semibold'
-                : 'text-[#565f6b] hover:text-[#101d26]'
-            }`}
-          >
-            <Database className="w-3.5 h-3.5" />
-            <span>Custom DB (.sql) Upload</span>
-          </button>
+          {isDatabaseSupported && (
+            <button
+              type="button"
+              onClick={() => setSubTab('database')}
+              className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                subTab === 'database'
+                  ? 'bg-[#FFFFFF] text-[#005459] shadow-2xs font-semibold'
+                  : 'text-[#565f6b] hover:text-[#101d26]'
+              }`}
+            >
+              <Database className="w-3.5 h-3.5" />
+              <span>Custom DB (.sql) Upload</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={() => setSubTab('artisan')}
-            className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
-              subTab === 'artisan'
-                ? 'bg-[#FFFFFF] text-[#005459] shadow-2xs font-semibold'
-                : 'text-[#565f6b] hover:text-[#101d26]'
-            }`}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>Artisan &amp; Migrations</span>
-          </button>
+          {isArtisanSupported && (
+            <button
+              type="button"
+              onClick={() => setSubTab('artisan')}
+              className={`px-3 py-1.5 rounded-[4px] text-[12px] font-medium transition-colors cursor-pointer flex items-center gap-1.5 ${
+                subTab === 'artisan'
+                  ? 'bg-[#FFFFFF] text-[#005459] shadow-2xs font-semibold'
+                  : 'text-[#565f6b] hover:text-[#101d26]'
+              }`}
+            >
+              <Terminal className="w-3.5 h-3.5" />
+              <span>Artisan &amp; Migrations</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -611,40 +694,111 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
                 <span className="text-[11px] font-mono font-normal px-2 py-0.5 rounded bg-[#F4F6F5] text-[#565f6b]">
                   {envVars.length} variables
                 </span>
+                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded uppercase tracking-wider bg-zinc-100 text-zinc-700 border border-zinc-200">
+                  {effectiveFramework === 'react' ? 'REACT' : effectiveFramework === 'laravel' ? 'LARAVEL' : effectiveFramework === 'node' ? 'NODE.JS' : 'CUSTOM'}
+                </span>
               </h3>
-              <p className="text-[11px] text-[#565f6b] mt-0.5">
-                Injected securely during build. Stored encrypted on the deployment server and written to <code className="font-mono text-[#005459]">{currentTarget.path || currentTarget.targetDir}/.env</code>.
+              <p className="text-[11px] text-zinc-500 mt-0.5">
+                Injected securely during build. Stored encrypted and written to <code className="font-mono text-zinc-800">{currentTarget.path || currentTarget.targetDir}/.env</code>.
               </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={loadReactPreset}
-                className="h-[30px] px-2.5 rounded-[6px] border border-[#B8E0C5] bg-[#EAF5EE] hover:bg-[#D5EFE0] text-[11px] font-semibold text-[#005459] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Populate standard React / Vite environment variables"
-              >
-                <Sparkles className="w-3 h-3 text-[#005459]" />
-                <span>React (Vite) Preset</span>
-              </button>
+              {/* Primary Preset Button */}
+              {effectiveFramework === 'react' && (
+                <button
+                  type="button"
+                  onClick={loadReactPreset}
+                  className="h-[30px] px-2.5 rounded-[5px] border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] font-medium text-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Populate standard React / Vite environment variables"
+                >
+                  <Layers className="w-3 h-3 text-zinc-500" />
+                  <span>React Preset</span>
+                </button>
+              )}
 
-              <button
-                type="button"
-                onClick={loadLaravelPreset}
-                className="h-[30px] px-2.5 rounded-[6px] border border-[#CDD4D0] hover:bg-[#F4F6F5] text-[11px] font-medium text-[#101d26] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Populate standard Laravel keys"
-              >
-                <Sparkles className="w-3 h-3 text-[#565f6b]" />
-                <span>Laravel Preset</span>
-              </button>
+              {effectiveFramework === 'laravel' && (
+                <button
+                  type="button"
+                  onClick={loadLaravelPreset}
+                  className="h-[30px] px-2.5 rounded-[5px] border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] font-medium text-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Populate standard Laravel keys & auto-generate APP_KEY"
+                >
+                  <Layers className="w-3 h-3 text-zinc-500" />
+                  <span>Laravel Preset</span>
+                </button>
+              )}
+
+              {effectiveFramework === 'node' && (
+                <button
+                  type="button"
+                  onClick={loadNodePreset}
+                  className="h-[30px] px-2.5 rounded-[5px] border border-zinc-200 bg-white hover:bg-zinc-50 text-[11px] font-medium text-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  title="Populate standard Node.js Express environment keys"
+                >
+                  <Layers className="w-3 h-3 text-zinc-500" />
+                  <span>Node.js Preset</span>
+                </button>
+              )}
+
+              {/* More Presets dropdown */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setShowPresetsMenu(!showPresetsMenu)}
+                  className="h-[30px] px-2 rounded-[5px] border border-zinc-200 hover:bg-zinc-50 text-[11px] font-medium text-zinc-700 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Select other framework presets"
+                >
+                  <span>More Presets</span>
+                  <ChevronDown className="w-3 h-3 text-zinc-400" />
+                </button>
+
+                {showPresetsMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-zinc-200 rounded-[6px] shadow-lg py-1 z-30 text-[12px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadReactPreset()
+                        setShowPresetsMenu(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-2 cursor-pointer text-zinc-800"
+                    >
+                      <span className="font-mono text-[10px] text-zinc-500">JS</span>
+                      <span>React (Vite)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadLaravelPreset()
+                        setShowPresetsMenu(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-2 cursor-pointer text-zinc-800"
+                    >
+                      <span className="font-mono text-[10px] text-zinc-500">PHP</span>
+                      <span>Laravel / PHP</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadNodePreset()
+                        setShowPresetsMenu(false)
+                      }}
+                      className="w-full text-left px-3 py-1.5 hover:bg-zinc-50 flex items-center gap-2 cursor-pointer text-zinc-800"
+                    >
+                      <span className="font-mono text-[10px] text-zinc-500">NODE</span>
+                      <span>Node.js / Express</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
               <button
                 type="button"
                 onClick={handleToggleRawMode}
-                className="h-[30px] px-2.5 rounded-[6px] border border-[#CDD4D0] hover:bg-[#F4F6F5] text-[11px] font-medium text-[#101d26] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+                className="h-[30px] px-2.5 rounded-[5px] border border-zinc-200 hover:bg-zinc-50 text-[11px] font-medium text-zinc-800 inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
-                <FileCode className="w-3 h-3 text-[#565f6b]" />
-                <span>{rawEnvMode ? 'Table Mode' : 'Raw Text Mode'}</span>
+                <FileCode className="w-3 h-3 text-zinc-500" />
+                <span>{rawEnvMode ? 'Table Mode' : 'Raw Text'}</span>
               </button>
 
               {canManage && (
@@ -652,7 +806,7 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
                   type="button"
                   onClick={handleSaveEnv}
                   disabled={savingEnv || loadingEnv}
-                  className="h-[30px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                  className="h-[30px] px-3.5 rounded-[5px] bg-zinc-900 hover:bg-zinc-800 active:bg-black text-white text-[12px] font-medium inline-flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs disabled:opacity-40"
                 >
                   {savingEnv ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                   <span>{savingEnv ? 'Saving...' : 'Save .env'}</span>
@@ -713,7 +867,25 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
                     <KeyRound className="w-6 h-6 text-[#8F9CA7] mx-auto mb-2" />
                     <div className="text-[13px] font-semibold text-[#101d26]">No environment variables configured</div>
                     <p className="text-[11px] text-[#565f6b] mt-0.5">
-                      Add variables manually or click <strong>Laravel Preset</strong> above.
+                      Add variables manually or click{' '}
+                      <button
+                        type="button"
+                        onClick={
+                          effectiveFramework === 'react'
+                            ? loadReactPreset
+                            : effectiveFramework === 'node'
+                            ? loadNodePreset
+                            : loadLaravelPreset
+                        }
+                        className="font-semibold text-[#005459] underline hover:text-[#0B5459] cursor-pointer"
+                      >
+                        {effectiveFramework === 'react'
+                          ? 'React (Vite) Preset'
+                          : effectiveFramework === 'node'
+                          ? 'Node.js Preset'
+                          : 'Laravel Preset'}
+                      </button>{' '}
+                      above.
                     </p>
                     <button
                       type="button"
@@ -725,53 +897,95 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    {envVars.map((item) => {
-                      const isHidden = hiddenKeys.has(item.id)
-                      return (
-                        <div key={item.id} className="flex items-center gap-2">
-                          {/* Key */}
-                          <div className="w-1/3">
-                            <input
-                              type="text"
-                              value={item.key}
-                              onChange={(e) => handleUpdateVar(item.id, 'key', e.target.value)}
-                              placeholder="KEY_NAME"
-                              className="w-full h-[34px] px-2.5 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] font-mono text-[12px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15 uppercase"
-                            />
-                          </div>
+                  <div className="space-y-3">
+                    {/* Modern Action Toolbar for Variables */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 p-2.5 rounded-[8px] bg-slate-50 border border-slate-200">
+                      <div className="relative flex items-center w-full sm:w-[260px]">
+                        <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                        <input
+                          type="text"
+                          value={filterKeyword}
+                          onChange={(e) => setFilterKeyword(e.target.value)}
+                          placeholder="Filter variables by key..."
+                          className="w-full h-[30px] pl-8 pr-2.5 bg-white border border-slate-200 rounded-[6px] text-[12px] font-mono outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600/20 placeholder:text-slate-400"
+                        />
+                      </div>
 
-                          {/* Value with eye toggle */}
-                          <div className="flex-1 relative flex items-center">
-                            <input
-                              type={isHidden ? 'password' : 'text'}
-                              value={item.value}
-                              onChange={(e) => handleUpdateVar(item.id, 'value', e.target.value)}
-                              placeholder="value"
-                              className="w-full h-[34px] pl-2.5 pr-8 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] font-mono text-[12px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
-                            />
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleToggleMaskAll}
+                          className="h-[30px] px-2.5 rounded-[6px] bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-medium text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          title={allMasked ? 'Reveal all secret values' : 'Mask all secret values'}
+                        >
+                          {allMasked ? <Eye className="w-3.5 h-3.5 text-slate-500" /> : <EyeOff className="w-3.5 h-3.5 text-slate-500" />}
+                          <span>{allMasked ? 'Reveal All' : 'Mask All'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={handleCopyAsEnv}
+                          className="h-[30px] px-2.5 rounded-[6px] bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-medium text-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                          title="Copy variables as .env formatted text"
+                        >
+                          {copiedEnv ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-500" />}
+                          <span>{copiedEnv ? 'Copied .env' : 'Copy as .env'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {displayedVars.length === 0 ? (
+                      <div className="py-8 text-center text-slate-500 text-[12px]">
+                        No variables matching filter "{filterKeyword}".
+                      </div>
+                    ) : (
+                      displayedVars.map((item) => {
+                        const isHidden = hiddenKeys.has(item.id)
+                        return (
+                          <div key={item.id} className="flex items-center gap-2">
+                            {/* Key */}
+                            <div className="w-1/3">
+                              <input
+                                type="text"
+                                value={item.key}
+                                onChange={(e) => handleUpdateVar(item.id, 'key', e.target.value)}
+                                placeholder="KEY_NAME"
+                                className="w-full h-[34px] px-2.5 bg-white border border-slate-200 rounded-[6px] font-mono text-[12px] text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/15 uppercase font-medium"
+                              />
+                            </div>
+
+                            {/* Value with eye toggle */}
+                            <div className="flex-1 relative flex items-center">
+                              <input
+                                type={isHidden ? 'password' : 'text'}
+                                value={item.value}
+                                onChange={(e) => handleUpdateVar(item.id, 'value', e.target.value)}
+                                placeholder="value"
+                                className="w-full h-[34px] pl-2.5 pr-8 bg-white border border-slate-200 rounded-[6px] font-mono text-[12px] text-slate-900 outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-600/15"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => toggleVisibility(item.id)}
+                                className="absolute right-2 text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                                title={isHidden ? 'Show value' : 'Mask value'}
+                              >
+                                {isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+
+                            {/* Delete */}
                             <button
                               type="button"
-                              onClick={() => toggleVisibility(item.id)}
-                              className="absolute right-2 text-[#8F9CA7] hover:text-[#101d26] p-1 cursor-pointer"
-                              title={isHidden ? 'Show value' : 'Mask value'}
+                              onClick={() => handleRemoveVar(item.id)}
+                              className="h-[34px] w-[34px] rounded-[6px] border border-slate-200 hover:bg-rose-50 hover:border-rose-200 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                              title="Remove variable"
                             >
-                              {isHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-
-                          {/* Delete */}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveVar(item.id)}
-                            className="h-[34px] w-[34px] rounded-[6px] border border-[#CDD4D0] hover:bg-[#FAEBE9] hover:border-[#F1B5AC] text-[#8F9CA7] hover:text-[#C2412D] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                            title="Remove variable"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      )
-                    })}
+                        )
+                      })
+                    )}
 
                     <div className="pt-2">
                       <button
@@ -887,12 +1101,13 @@ export function EnvironmentManager({ projectId, targets = [], canManage = true, 
                 </div>
 
                 <div>
-                  <label className="block text-[11px] text-[#565f6b] mb-1 font-medium">Database Password</label>
+                  <label className="block text-[11px] text-[#565f6b] mb-1 font-medium">Database Password <span className="text-[10px] text-[#85929E] font-normal">(leave blank if no password)</span></label>
                   <input
                     type="password"
+                    autoComplete="new-password"
                     value={dbPass}
                     onChange={(e) => setDbPass(e.target.value)}
-                    placeholder="MySQL password"
+                    placeholder="Leave empty for blank password"
                     className="w-full h-[32px] px-2.5 bg-white border border-[#CDD4D0] rounded-[4px] font-mono text-[12px] text-[#101d26] outline-none focus:border-[#005459]"
                   />
                 </div>
