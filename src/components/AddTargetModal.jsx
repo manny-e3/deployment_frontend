@@ -283,6 +283,13 @@ export NODE_OPTIONS="--max-old-space-size=512"
 
 echo "Building with Node: $(node -v) | npm: $(npm -v)"
 
+# Neutralize hardcoded subdirectory router base overrides for root domain
+case "$(basename "$(pwd)")" in
+  public_html|html|www|public|htdocs|web)
+    sed -i -E '/^[[:space:]]*VITE_ROUTER_BASE[[:space:]]*=/d' .env .env.production .env.local 2>/dev/null || true
+    ;;
+esac
+
 # 2. Install dependencies & build production assets with relative base
 npm ci 2>/dev/null || npm install
 RAYON_NUM_THREADS=1 npm run build -- --base=./
@@ -531,11 +538,13 @@ fi`
       '  cp -rf build/* .',
       'fi',
       '',
-      '# Normalize relative asset paths for Apache subdirectory hosting',
+      '# Ensure <base href="/$DIR_BASENAME/"> is set in index.html for correct asset resolution across all deep routes',
       'if [ -f "index.html" ]; then',
-      '  sed -i -E \'s/(href|src)="\\/assets\\//\\1=".\\/assets\\//g\' index.html 2>/dev/null || true',
-      '  sed -i -E \'s/(href|src)="\\/favicon/\\1=".\\/favicon/g\' index.html 2>/dev/null || true',
-      '  sed -i -E \'s/<base href="\\/"/<base href=".\\/"/g\' index.html 2>/dev/null || true',
+      '  if grep -q "<base" index.html; then',
+      '    sed -i -E \'s/<base[^>]*>/<base href="\\/\'"$DIR_BASENAME"\'\\/" \\/>/g\' index.html 2>/dev/null || true',
+      '  else',
+      '    sed -i -E \'s/<head>/<head>\\n    <base href="\\/\'"$DIR_BASENAME"\'\\/" \\/>/g\' index.html 2>/dev/null || true',
+      '  fi',
       'fi',
       '',
       'echo "Configuring Apache SPA fallback routing (.htaccess)..."',
