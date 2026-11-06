@@ -31,7 +31,7 @@ import {
   Monitor,
   MoreVertical,
 } from 'lucide-react'
-import { AddServerModal, WindowsLogo, LinuxLogo, CPanelLogo, DockerLogo } from '../components/AddServerModal'
+import { AddServerModal, WindowsLogo, LinuxLogo } from '../components/AddServerModal'
 import { ServerTerminalModal } from '../components/ServerTerminalModal'
 import { HostResourceTelemetry } from '../components/HostResourceTelemetry'
 import { useAuth } from '../context/AuthContext'
@@ -47,7 +47,7 @@ export function ServersView() {
   const [terminalServer, setTerminalServer] = useState(null)
   const [telemetryServer, setTelemetryServer] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [osFilter, setOsFilter] = useState('ALL') // 'ALL' | 'LINUX' | 'WINDOWS' | 'CPANEL_SFTP' | 'DOCKER'
+  const [osFilter, setOsFilter] = useState('ALL') // 'ALL' | 'LINUX' | 'WINDOWS'
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState(null)
   const [copiedId, setCopiedId] = useState(null)
@@ -66,53 +66,26 @@ export function ServersView() {
       const res = await api('/servers')
       const items = Array.isArray(res) ? res : res?.items || []
       const mapped = items.filter(Boolean).map((s) => {
-        const isCpanel =
-          s?.serverType === 'CPANEL_SFTP' ||
-          s?.osType === 'CPANEL_SFTP' ||
-          s?.protocol === 'SFTP' ||
-          s?.protocol === 'FTPS' ||
-          s?.name?.toLowerCase().includes('cpanel') ||
-          s?.iconType === 'cpanel' ||
-          s?.host === 'travaiq.com'
-
-        const isDocker =
-          s?.serverType === 'DOCKER' ||
-          s?.osType === 'DOCKER' ||
-          s?.port === 2376 ||
-          s?.protocol?.includes('DOCKER') ||
-          s?.name?.toLowerCase().includes('docker') ||
-          s?.iconType === 'docker'
-
         const isWin =
-          !isCpanel && !isDocker && (
-            s?.osType === 'WINDOWS' ||
-            s?.serverType === 'WINDOWS' ||
-            s?.port === 5985 ||
-            s?.port === 5986 ||
-            s?.protocol?.includes('WINRM') ||
-            s?.name?.toLowerCase().includes('win')
-          )
+          s?.osType === 'WINDOWS' ||
+          s?.serverType === 'WINDOWS' ||
+          s?.port === 5985 ||
+          s?.port === 5986 ||
+          s?.protocol?.includes('WINRM') ||
+          s?.name?.toLowerCase().includes('win')
 
-        const detectedType = isCpanel ? 'CPANEL_SFTP' : isDocker ? 'DOCKER' : isWin ? 'WINDOWS' : 'LINUX'
-        const detectedPort = s?.port || (isCpanel ? 22 : isDocker ? 2376 : isWin ? 5985 : 22)
-        const defaultUser = isCpanel ? 'cpanel_user' : isDocker ? 'root' : isWin ? 'Administrator' : 'deploy'
+        const detectedType = isWin ? 'WINDOWS' : 'LINUX'
+        const detectedPort = s?.port || (isWin ? 5985 : 22)
+        const defaultUser = isWin ? 'Administrator' : 'deploy'
         const username = s?.username || defaultUser
         const detectedProtocol = s?.protocol || (
-          isCpanel ? 'SFTP' :
-            isDocker ? 'TLS_SOCKET' :
-              isWin ? (detectedPort === 5986 ? 'WINRM_HTTPS' : detectedPort === 22 ? 'OPENSSH' : 'WINRM_HTTP') :
-                'SSH'
+          isWin ? (detectedPort === 5986 ? 'WINRM_HTTPS' : detectedPort === 22 ? 'OPENSSH' : 'WINRM_HTTP') : 'SSH'
         )
-        const detectedVersion = s?.gitVersion || (
-          isCpanel ? 'Pure SFTP · Zero-Shell' :
-            isDocker ? 'Docker Engine 27.3 · API v1.47' :
-              isWin ? 'PowerShell 7.4' :
-                'git 2.43.0'
-        )
+        const detectedVersion = s?.gitVersion || (isWin ? 'PowerShell 7.4' : 'git 2.43.0')
 
         return {
           id: s?.id,
-          name: s?.name || (isCpanel ? 'cPanel Web Host' : isDocker ? 'Remote Docker Host' : isWin ? 'Windows Server' : 'Linux Server'),
+          name: s?.name || (isWin ? 'Windows Server' : 'Linux Server'),
           hostname: s?.host || '',
           osType: detectedType,
           serverType: detectedType,
@@ -121,14 +94,14 @@ export function ServersView() {
           username: username,
           address: `${username}@${s?.host || 'localhost'}:${detectedPort}`,
           authType: s?.authType === 'KEY' ? 'SSH Key' : 'Password',
-          authKeyType: isWin ? 'winrm/cert' : isDocker ? 'docker-tls' : isCpanel ? 'sftp-creds' : 'ed25519',
+          authKeyType: isWin ? 'winrm/cert' : 'ed25519',
           pipelineCount: s?.targetsCount ?? s?.targets?.length ?? 0,
           pipelineProjects: s?.targetsCount ? `${s.targetsCount} targets` : 'None',
           status: s?.lastCheckOk ? 'online' : s?.lastCheckOk === false ? 'error' : 'online',
           errorMessage: s?.lastCheckOk === false ? 'Connection test failed' : undefined,
           gitVersion: detectedVersion,
           checkedAgo: s?.lastCheckAt ? new Date(s.lastCheckAt).toLocaleTimeString() : 'Recently',
-          iconType: isCpanel ? 'cpanel' : isDocker ? 'docker' : isWin ? 'windows' : 'cloud',
+          iconType: isWin ? 'windows' : 'cloud',
           cpuUsage: s?.cpuUsage ?? Math.floor(18 + (s?.id ? (String(s.id).charCodeAt(0) % 35) : 22)),
           ramUsage: s?.ramUsage ?? Math.floor(40 + (s?.id ? (String(s.id).charCodeAt(0) % 45) : 38)),
           diskUsage: s?.diskUsage ?? Math.floor(28 + (s?.id ? (String(s.id).charCodeAt(0) % 48) : 42)),
@@ -156,19 +129,11 @@ export function ServersView() {
   const handleTestServer = async (srv) => {
     setTestingId(srv.id)
     const isWin = srv.serverType === 'WINDOWS' || srv.osType === 'WINDOWS'
-    const isCpanel = srv.serverType === 'CPANEL_SFTP' || srv.osType === 'CPANEL_SFTP'
-    const isDocker = srv.serverType === 'DOCKER' || srv.osType === 'DOCKER'
 
     try {
       const res = await api(`/servers/${srv.id}/test`, { method: 'POST' }).catch(() => null)
 
-      const defaultVer = isCpanel
-        ? 'Pure SFTP · Zero-Shell'
-        : isDocker
-          ? 'Docker Engine 27.3 · API v1.47'
-          : isWin
-            ? 'PowerShell 7.4 · WinRM'
-            : 'git 2.43.0'
+      const defaultVer = isWin ? 'PowerShell 7.4 · WinRM' : 'git 2.43.0'
 
       setServers((prev) =>
         prev.map((s) =>
@@ -187,15 +152,7 @@ export function ServersView() {
       let desc = `Connected as ${res?.whoami || srv.username}. OpenSSH and Git tools responsive.`
       let sub = `Host: ${srv.hostname || srv.address} (${srv.protocol || 'SSH'})`
 
-      if (isCpanel) {
-        title = 'cPanel / SFTP Host Verified'
-        desc = `Connected as ${srv.username}. Pure SFTP file streaming operational without shell execution restriction.`
-        sub = `Host: ${srv.hostname || srv.address} (SFTP Subsystem)`
-      } else if (isDocker) {
-        title = 'Remote Docker Daemon Verified'
-        desc = `Connected to Docker Engine. API responsive for container orchestrations and compose builds.`
-        sub = `Host: ${srv.hostname || srv.address} (${srv.protocol || 'TLS_SOCKET'})`
-      } else if (isWin) {
+      if (isWin) {
         title = 'Windows Host Verified'
         desc = `Connected as ${srv.username}. WinRM handshake nominal · PowerShell runtime active.`
         sub = `Host: ${srv.hostname || srv.address} (WinRM)`
@@ -248,8 +205,6 @@ export function ServersView() {
     if (osFilter !== 'ALL') {
       if (osFilter === 'LINUX' && s.serverType !== 'LINUX' && s.osType !== 'LINUX') return false
       if (osFilter === 'WINDOWS' && s.serverType !== 'WINDOWS' && s.osType !== 'WINDOWS') return false
-      if (osFilter === 'CPANEL_SFTP' && s.serverType !== 'CPANEL_SFTP' && s.osType !== 'CPANEL_SFTP') return false
-      if (osFilter === 'DOCKER' && s.serverType !== 'DOCKER' && s.osType !== 'DOCKER') return false
     }
 
     if (!searchQuery) return true
@@ -265,24 +220,8 @@ export function ServersView() {
 
   const linuxCount = servers.filter((s) => s.serverType === 'LINUX' || s.osType === 'LINUX').length
   const windowsCount = servers.filter((s) => s.serverType === 'WINDOWS' || s.osType === 'WINDOWS').length
-  const cpanelCount = servers.filter((s) => s.serverType === 'CPANEL_SFTP' || s.osType === 'CPANEL_SFTP').length
-  const dockerCount = servers.filter((s) => s.serverType === 'DOCKER' || s.osType === 'DOCKER').length
 
   const renderServerIcon = (srv) => {
-    if (srv.serverType === 'CPANEL_SFTP' || srv.iconType === 'cpanel') {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#FFF4E5] border border-[#FED7AA] text-[#C2410C] flex items-center justify-center shrink-0" title="cPanel / Pure SFTP Server">
-          <CPanelLogo className="w-4 h-4" />
-        </div>
-      )
-    }
-    if (srv.serverType === 'DOCKER' || srv.iconType === 'docker') {
-      return (
-        <div className="w-7 h-7 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] text-[#0284C7] flex items-center justify-center shrink-0" title="Remote Docker Engine Daemon">
-          <DockerLogo className="w-4 h-4" />
-        </div>
-      )
-    }
     if (srv.osType === 'WINDOWS' || srv.iconType === 'windows') {
       return (
         <div className="w-7 h-7 rounded-[6px] bg-[#EBF3FC] border border-[#C5DCFA] text-[#0078D4] flex items-center justify-center shrink-0" title="Windows Server / WinRM">
@@ -412,22 +351,13 @@ export function ServersView() {
                               {srv.name}
                             </span>
                             <span
-                              className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-mono font-medium border ${srv.serverType === 'CPANEL_SFTP'
-                                  ? 'bg-[#FFF4E5] text-[#C2410C] border-[#FED7AA]'
-                                  : srv.serverType === 'DOCKER'
-                                    ? 'bg-[#E0F2FE] text-[#0284C7] border-[#BAE6FD]'
-                                    : srv.osType === 'WINDOWS'
-                                      ? 'bg-[#EBF3FC] text-[#0078D4] border-[#C5DCFA]'
-                                      : 'bg-[#EAF5EE] text-[#005459] border-[#B8E0C5]'
-                                }`}
+                              className={`px-1.5 py-0.2 rounded-[3px] text-[10px] font-mono font-medium border ${
+                                srv.osType === 'WINDOWS'
+                                  ? 'bg-[#EBF3FC] text-[#0078D4] border-[#C5DCFA]'
+                                  : 'bg-[#EAF5EE] text-[#005459] border-[#B8E0C5]'
+                              }`}
                             >
-                              {srv.serverType === 'CPANEL_SFTP'
-                                ? 'cPanel · SFTP'
-                                : srv.serverType === 'DOCKER'
-                                  ? 'Docker Daemon'
-                                  : srv.osType === 'WINDOWS'
-                                    ? 'Windows Server'
-                                    : 'Linux'}
+                              {srv.osType === 'WINDOWS' ? 'Windows Server' : 'Linux'}
                             </span>
                           </div>
                           <div className="font-mono text-[11px] text-[#565f6b] mt-0.5">
@@ -531,17 +461,12 @@ export function ServersView() {
                           type="button"
                           onClick={() => setTerminalServer(srv)}
                           className="h-[28px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F4F6F5] text-[#101d26] text-[11px] font-mono font-medium inline-flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                          title={`Open live ${srv.serverType === 'CPANEL_SFTP'
-                              ? 'SFTP Directory & Transfer Session'
-                              : srv.serverType === 'DOCKER'
-                                ? 'Docker Container Shell'
-                                : srv.osType === 'WINDOWS'
-                                  ? 'PowerShell'
-                                  : 'SSH'
+                          title={`Open live ${
+                              srv.osType === 'WINDOWS' ? 'PowerShell' : 'SSH'
                             } Console`}
                         >
                           <Terminal className="w-3.5 h-3.5 text-[#005459]" />
-                          <span>{srv.serverType === 'CPANEL_SFTP' ? 'SFTP' : srv.serverType === 'DOCKER' ? 'Docker' : 'Console'}</span>
+                          <span>Console</span>
                         </button>
 
                         <div className="relative inline-block text-left">

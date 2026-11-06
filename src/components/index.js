@@ -1,4 +1,4 @@
-export { AddServerModal, WindowsLogo, LinuxLogo, CPanelLogo, DockerLogo } from './AddServerModal'
+export { AddServerModal, WindowsLogo, LinuxLogo } from './AddServerModal'
 export { AddTargetModal } from './AddTargetModal'
 export { AppLayout } from './AppLayout'
 export { Button } from './Button'
