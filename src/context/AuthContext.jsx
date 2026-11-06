@@ -298,6 +298,26 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const forgotPassword = async (email) => {
+    return api('/auth/forgot-password', {
+      method: 'POST',
+      body: { email: email.toLowerCase().trim() },
+    })
+  }
+
+  const verifyResetToken = async (token) => {
+    return api(`/auth/verify-reset-token?token=${encodeURIComponent(token)}`, {
+      method: 'GET',
+    })
+  }
+
+  const resetPassword = async ({ token, newPassword }) => {
+    return api('/auth/reset-password', {
+      method: 'POST',
+      body: { token, newPassword },
+    })
+  }
+
   const isSuperAdmin = user?.role?.toUpperCase() === 'SUPER_ADMIN' || user?.isSuperAdmin === true
   const organizationName = user?.organizationName || 'Primary Workspace'
 
@@ -315,6 +335,9 @@ export function AuthProvider({ children }) {
         onboardMembers,
         updateOrganization,
         logout,
+        forgotPassword,
+        verifyResetToken,
+        resetPassword,
         isAuthenticated: !!user,
       }}
     >

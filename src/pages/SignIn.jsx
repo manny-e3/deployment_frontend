@@ -16,7 +16,6 @@ export function SignIn() {
   const [showPassword, setShowPassword] = useState(false)
   const [rememberSession, setRememberSession] = useState(true)
   const [errorMessage, setErrorMessage] = useState(null)
-  const [errorRequestId, setErrorRequestId] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const hasError = Boolean(errorMessage)
@@ -32,7 +31,6 @@ export function SignIn() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsSubmitting(true)
-    setErrorRequestId(null)
     setErrorMessage(null)
 
     try {
@@ -43,9 +41,6 @@ export function SignIn() {
       navigate(from, { replace: true })
     } catch (err) {
       setErrorMessage(err.message || 'Email or password is incorrect.')
-      if (err.requestId) {
-        setErrorRequestId(err.requestId)
-      }
     } finally {
       setIsSubmitting(false)
     }
@@ -90,16 +85,9 @@ export function SignIn() {
 
         {/* Error Alert Banner */}
         {errorMessage && (
-          <div className="mt-5 p-3 rounded-[6px] bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 text-[12.5px] space-y-1">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-            {errorRequestId && (
-              <div className="text-[10px] font-mono text-red-500 pl-6">
-                Request ID: {errorRequestId}
-              </div>
-            )}
+          <div className="mt-5 p-3 rounded-[6px] bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-400 text-[12.5px] flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{errorMessage}</span>
           </div>
         )}
 
@@ -134,6 +122,12 @@ export function SignIn() {
               <label className="block text-[12.5px] font-medium text-zinc-900 dark:text-zinc-200">
                 Password
               </label>
+              <Link
+                to="/forgot-password"
+                className="text-[12px] font-medium text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:underline transition-colors"
+              >
+                Forgot password?
+              </Link>
             </div>
             <div className="relative">
               <input

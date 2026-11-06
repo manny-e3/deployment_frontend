@@ -82,7 +82,16 @@ async function send(path, { method = 'GET', body, query } = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  if (WRITE.has(method) && !['/auth/login', '/auth/register', '/auth/accept-invite'].includes(path)) {
+  if (
+    WRITE.has(method) &&
+    ![
+      '/auth/login',
+      '/auth/register',
+      '/auth/accept-invite',
+      '/auth/forgot-password',
+      '/auth/reset-password',
+    ].includes(path)
+  ) {
     const csrf = getCsrfToken();
     if (csrf) {
       headers['X-CSRF-Token'] = decodeURIComponent(csrf);
@@ -124,7 +133,15 @@ export const refreshSession = () =>
 
 export async function api(path, options = {}) {
   let res = await send(path, options);
-  const isAuthCall = path === '/auth/login' || path === '/auth/register' || path === '/auth/accept-invite' || path === '/auth/refresh';
+  const isAuthCall = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/accept-invite',
+    '/auth/refresh',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+    '/auth/verify-reset-token',
+  ].includes(path);
 
   // Automatically capture CSRF token if returned in header
   const csrfHeader = res.headers.get('X-CSRF-Token') || res.headers.get('x-csrf-token');

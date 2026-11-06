@@ -15,6 +15,8 @@ import {
   SettingsView,
   SignIn,
   Register,
+  ForgotPassword,
+  ResetPassword,
   OnboardingView,
   AcceptInvite,
   LandingPage,
@@ -48,6 +50,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
 
             {/* Super Admin Guided Onboarding Route */}
