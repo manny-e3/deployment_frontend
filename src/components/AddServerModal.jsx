@@ -280,10 +280,6 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
       setTestStatus('success')
       if (serverType === 'WINDOWS') {
         setTestDetails('WinRM responder active · PowerShell 7.4 runtime detected · Windows Server 2022')
-      } else if (serverType === 'CPANEL_SFTP') {
-        setTestDetails('SFTP subsystem active · Handshake verified · Write permissions on remote web root confirmed (Zero-Shell)')
-      } else if (serverType === 'DOCKER') {
-        setTestDetails('Docker Engine daemon reachable · Docker API v1.47 · Engine 27.3.1-ce online')
       } else {
         setTestDetails('OpenSSH 8.9p1 handshake successful · Git 2.43.0 available')
       }
@@ -509,7 +505,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                 {serverToEdit ? `Edit server: ${serverToEdit.name}` : 'Add target server'}
               </h2>
               <p className="text-[12px] text-[#565f6b] mt-0.5">
-                Configure Linux, Windows Server, or Docker target infrastructure for automated release pipelines.
+                Configure Linux / Unix or Windows Server target infrastructure for automated release pipelines.
               </p>
             </div>
           </div>
@@ -537,21 +533,21 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             <label className="block text-[12px] font-semibold text-[#101d26] mb-2 uppercase font-mono tracking-wider">
               Server Type &amp; Operating Protocol
             </label>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {/* Linux Card */}
               <button
                 type="button"
                 onClick={() => handleServerTypeChange('LINUX')}
-                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                className={`p-3.5 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
                   serverType === 'LINUX'
                     ? 'border-[#005459] bg-[#E2F0FD]/60 ring-2 ring-[#005459]/20 text-[#101d26]'
                     : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
                 }`}
               >
                 <div
-                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
+                  className={`w-8 h-8 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
                     serverType === 'LINUX'
-                      ? 'bg-[#005459] text-white'
+                      ? 'bg-[#005459] text-white shadow-2xs'
                       : 'bg-[#F4F6F5] text-[#565f6b]'
                   }`}
                 >
@@ -564,8 +560,8 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                     )}
                   </div>
-                  <div className="text-[11px] text-[#565f6b] mt-0.5">
-                    OpenSSH · bash · Ubuntu / Debian / RHEL
+                  <div className="text-[11px] text-[#565f6b] mt-0.5 leading-snug">
+                    OpenSSH · bash · Ubuntu / Debian / RHEL / AlmaLinux
                   </div>
                 </div>
               </button>
@@ -574,16 +570,16 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
               <button
                 type="button"
                 onClick={() => handleServerTypeChange('WINDOWS')}
-                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                className={`p-3.5 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
                   serverType === 'WINDOWS'
                     ? 'border-[#0078D4] bg-[#EBF3FC] ring-2 ring-[#0078D4]/25 text-[#101d26]'
                     : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
                 }`}
               >
                 <div
-                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
+                  className={`w-8 h-8 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
                     serverType === 'WINDOWS'
-                      ? 'bg-[#0078D4] text-white'
+                      ? 'bg-[#0078D4] text-white shadow-2xs'
                       : 'bg-[#F4F6F5] text-[#565f6b]'
                   }`}
                 >
@@ -596,72 +592,8 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                       <span className="w-1.5 h-1.5 rounded-full bg-[#0078D4]" />
                     )}
                   </div>
-                  <div className="text-[11px] text-[#565f6b] mt-0.5">
-                    WinRM / OpenSSH · PowerShell · IIS
-                  </div>
-                </div>
-              </button>
-
-              {/* cPanel / Web Hosting (SFTP) Card */}
-              <button
-                type="button"
-                onClick={() => handleServerTypeChange('CPANEL_SFTP')}
-                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                  serverType === 'CPANEL_SFTP'
-                    ? 'border-[#D9531E] bg-[#FFF8F3] ring-2 ring-[#D9531E]/25 text-[#101d26]'
-                    : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
-                }`}
-              >
-                <div
-                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
-                    serverType === 'CPANEL_SFTP'
-                      ? 'bg-[#D9531E] text-white'
-                      : 'bg-[#F4F6F5] text-[#565f6b]'
-                  }`}
-                >
-                  <CPanelLogo className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[13px] font-bold text-[#101d26] flex items-center gap-1.5">
-                    <span>cPanel / SFTP Host</span>
-                    {serverType === 'CPANEL_SFTP' && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#D9531E]" />
-                    )}
-                  </div>
-                  <div className="text-[11px] text-[#565f6b] mt-0.5">
-                    Pure SFTP · Zero-Shell · Bypasses &quot;Unable to exec&quot;
-                  </div>
-                </div>
-              </button>
-
-              {/* Remote Docker Host Card */}
-              <button
-                type="button"
-                onClick={() => handleServerTypeChange('DOCKER')}
-                className={`p-3 rounded-[8px] border text-left flex items-start gap-3 transition-all cursor-pointer ${
-                  serverType === 'DOCKER'
-                    ? 'border-[#0288D1] bg-[#F0F8FF] ring-2 ring-[#0288D1]/25 text-[#101d26]'
-                    : 'border-[#CDD4D0] bg-[#FFFFFF] hover:bg-[#F8FAF9] text-[#565f6b]'
-                }`}
-              >
-                <div
-                  className={`w-7 h-7 rounded-[6px] flex items-center justify-center shrink-0 mt-0.5 ${
-                    serverType === 'DOCKER'
-                      ? 'bg-[#0288D1] text-white'
-                      : 'bg-[#F4F6F5] text-[#565f6b]'
-                  }`}
-                >
-                  <DockerLogo className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-[13px] font-bold text-[#101d26] flex items-center gap-1.5">
-                    <span>Remote Docker Host</span>
-                    {serverType === 'DOCKER' && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#0288D1]" />
-                    )}
-                  </div>
-                  <div className="text-[11px] text-[#565f6b] mt-0.5">
-                    Docker Engine API · TLS Socket · Compose
+                  <div className="text-[11px] text-[#565f6b] mt-0.5 leading-snug">
+                    WinRM / OpenSSH · PowerShell · IIS · Windows Server
                   </div>
                 </div>
               </button>
@@ -729,107 +661,6 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
             </div>
           )}
 
-          {/* cPanel / SFTP Configuration Banner */}
-          {serverType === 'CPANEL_SFTP' && (
-            <div className="p-3.5 bg-[#FFF8F3] border border-[#F6D0B0] rounded-[8px] space-y-2.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold text-[#D9531E] flex items-center gap-1.5">
-                  <CPanelLogo className="w-3.5 h-3.5" />
-                  <span>cPanel &amp; Web Hosting (SFTP / No-Shell Mode)</span>
-                </span>
-                <span className="text-[10px] font-mono text-[#D9531E] bg-[#FFEADA] px-2 py-0.5 rounded font-semibold">
-                  Pure SFTP File Transfer
-                </span>
-              </div>
-              <p className="text-[11px] text-[#703010] leading-relaxed">
-                <strong>Resolves &quot;Unable to exec&quot; restrictions:</strong> Uses pure SFTP (Port 22 or 21) file streaming without requiring interactive SSH shell command execution (<code className="bg-[#FFEADA] px-1 py-0.2 rounded font-mono">exec</code>). Ideal for shared hosting, cPanel accounts (e.g. travaiq.com), and jailed environments.
-              </p>
-              <div className="grid grid-cols-2 gap-2 pt-1">
-                <div>
-                  <label className="block text-[11px] font-medium text-[#101d26] mb-1">
-                    SFTP Protocol
-                  </label>
-                  <select
-                    value={sftpProtocol}
-                    onChange={(e) => {
-                      setSftpProtocol(e.target.value)
-                      setPort(e.target.value === 'FTPS' ? '21' : '22')
-                    }}
-                    className="w-full h-[32px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-white font-mono text-[11px]"
-                  >
-                    <option value="SFTP">SFTP (SSH File Transfer - Port 22)</option>
-                    <option value="FTPS">FTPS (Explicit TLS - Port 21)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[11px] font-medium text-[#101d26] mb-1">
-                    Default Remote Web Root
-                  </label>
-                  <input
-                    type="text"
-                    value={cpanelRemoteRoot}
-                    onChange={(e) => setCpanelRemoteRoot(e.target.value)}
-                    placeholder="/public_html"
-                    className="w-full h-[32px] px-2.5 rounded-[4px] border border-[#CDD4D0] bg-white font-mono text-[11px]"
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Docker Host Configuration Banner */}
-          {serverType === 'DOCKER' && (
-            <div className="p-3.5 bg-[#F0F8FF] border border-[#BCE0FD] rounded-[8px] space-y-2.5 animate-in fade-in duration-200">
-              <div className="flex items-center justify-between">
-                <span className="text-[12px] font-bold text-[#0288D1] flex items-center gap-1.5">
-                  <DockerLogo className="w-3.5 h-3.5" />
-                  <span>Remote Docker Host (Docker Engine Daemon API)</span>
-                </span>
-                <span className="text-[10px] font-mono text-[#0288D1] bg-[#E1F2FE] px-2 py-0.5 rounded font-semibold">
-                  Docker Engine &amp; Compose
-                </span>
-              </div>
-              <p className="text-[11px] text-[#025684] leading-relaxed">
-                Connects directly to the Docker Engine daemon over TCP socket (<code className="bg-[#E1F2FE] px-1 py-0.2 rounded font-mono">tcp://:2376</code>) or SSH socket. Orchestrates container image pulls, rolling container updates, container health checks, and Docker Compose without manual shell scripting.
-              </p>
-              <div className="space-y-1 pt-1">
-                <label className="block text-[11px] font-medium text-[#101d26] mb-1">
-                  Docker Daemon Connection Mode
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDockerProtocol('TLS_SOCKET')
-                      setPort('2376')
-                    }}
-                    className={`py-1.5 px-2 rounded-[5px] text-[11px] font-mono font-medium border text-center transition-colors cursor-pointer ${
-                      dockerProtocol === 'TLS_SOCKET'
-                        ? 'bg-[#0288D1] text-white border-[#0288D1] font-bold shadow-2xs'
-                        : 'bg-white text-[#565f6b] border-[#CDD4D0] hover:bg-[#F4F6F5]'
-                    }`}
-                  >
-                    Docker TLS Socket (Port 2376)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setDockerProtocol('SSH_SOCKET')
-                      setPort('22')
-                    }}
-                    className={`py-1.5 px-2 rounded-[5px] text-[11px] font-mono font-medium border text-center transition-colors cursor-pointer ${
-                      dockerProtocol === 'SSH_SOCKET'
-                        ? 'bg-[#0288D1] text-white border-[#0288D1] font-bold shadow-2xs'
-                        : 'bg-white text-[#565f6b] border-[#CDD4D0] hover:bg-[#F4F6F5]'
-                    }`}
-                  >
-                    Docker over SSH (Port 22)
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Server Name */}
           <div>
             <label className="block text-[12px] font-medium text-[#101d26] mb-1">
@@ -842,7 +673,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
               placeholder={
                 serverType === 'WINDOWS'
                   ? 'e.g. win-iis-prod-01 or Windows App Server'
-                  : 'e.g. cPanel Production or web-gateway-01'
+                  : 'e.g. Ubuntu Web Gateway or prod-api-01'
               }
               className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15 font-mono"
               required
@@ -862,7 +693,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                 placeholder={
                   serverType === 'WINDOWS'
                     ? 'e.g. winserver01.corp.net or 192.168.1.150'
-                    : 'e.g. server14.tela-host.com or 198.51.100.12'
+                    : 'e.g. 192.168.1.50 or api.company.com'
                 }
                 className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] font-mono outline-none focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/15"
                 required

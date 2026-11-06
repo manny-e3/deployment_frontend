@@ -308,7 +308,7 @@ export function ServersView() {
             </h1>
           </div>
           <p className="text-[12px] text-[#565f6b] mt-0.5">
-            Manage Linux OpenSSH, Windows WinRM, cPanel SFTP, and remote Docker deployment nodes.
+            Manage Linux (OpenSSH) and Windows Server (WinRM / OpenSSH) deployment nodes.
           </p>
         </div>
 
