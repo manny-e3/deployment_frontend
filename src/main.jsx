@@ -21,6 +21,8 @@ const getBasename = () => {
   const topLevelRoutes = new Set([
     'login',
     'register',
+    'forgot-password',
+    'reset-password',
     'accept-invite',
     'onboarding',
     'dashboard',
