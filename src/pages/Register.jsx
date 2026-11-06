@@ -91,7 +91,7 @@ export function Register() {
 
       <div className="w-full max-w-[460px] bg-white dark:bg-[#0D1219] border border-zinc-200 dark:border-zinc-800 rounded-[8px] p-8 shadow-xs">
         {/* Brand Logo */}
-        <Link to="/" className="inline-block hover:opacity-85 transition-opacity" title="Back to Slipway">
+        <Link to="/" className="inline-block hover:opacity-85 transition-opacity" title="Back to PortalOps">
           <SlipwayLogo size="lg" />
         </Link>
 

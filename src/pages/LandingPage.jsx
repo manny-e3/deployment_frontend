@@ -21,7 +21,7 @@ export function LandingPage() {
   const { isDark, toggleTheme } = useTheme()
   const [copiedCli, setCopiedCli] = useState(false)
 
-  const cliCommand = 'curl -fsSL https://get.slipway.run | bash'
+  const cliCommand = 'curl -fsSL https://get.portalops.online | bash'
 
   const handleCopyCli = () => {
     navigator.clipboard?.writeText(cliCommand)
@@ -63,7 +63,7 @@ export function LandingPage() {
           <Link to="/" className="flex items-center gap-2.5">
             <SlipwayLogo size="md" />
             <span className={`font-semibold text-[15.5px] tracking-tight ${isDark ? 'text-white' : 'text-zinc-950'}`}>
-              Slipway
+              PortalOps
             </span>
           </Link>
           <span
@@ -261,7 +261,7 @@ export function LandingPage() {
               <span className="w-2.5 h-2.5 rounded-full bg-[#E06C75]" />
               <span className="w-2.5 h-2.5 rounded-full bg-[#E5C07B]" />
               <span className="w-2.5 h-2.5 rounded-full bg-[#98C379]" />
-              <span className="ml-2 text-[11px] text-zinc-400 font-medium">slipway.ctl   pipeline run #482</span>
+              <span className="ml-2 text-[11px] text-zinc-400 font-medium">portalops.ctl   pipeline run #482</span>
             </div>
             <div className="flex items-center gap-3 text-[11px]">
               <span className="px-2 py-0.5 rounded bg-[#00DF8F]/15 border border-[#00DF8F]/30 text-[#00DF8F] text-[10px] font-semibold flex items-center gap-1.5">
@@ -425,7 +425,7 @@ export function LandingPage() {
             Engineered for mission-critical reliability and<br className="hidden sm:inline" /> unstoppable teams.
           </h2>
           <p className={`mt-2.5 text-[14px] max-w-2xl leading-relaxed ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-            Every component of Slipway is designed to neutralize release risks, eliminate human operator error, and maximize throughput.
+            Every component of PortalOps is designed to neutralize release risks, eliminate human operator error, and maximize throughput.
           </p>
         </div>
 
@@ -452,7 +452,7 @@ export function LandingPage() {
                 Atomic Zero-Downtime Swaps
               </h3>
               <p className={`mt-2.5 text-[13px] leading-relaxed font-normal ${isDark ? 'text-zinc-400' : 'text-zinc-600'}`}>
-                Instant symlink pointer redirects swap production traffic with nanosecond precision. If any preflight or post-release check flags an irregularity, Slipway reverts pointers instantaneously without dropping an active connection.
+                Instant symlink pointer redirects swap production traffic with nanosecond precision. If any preflight or post-release check flags an irregularity, PortalOps reverts pointers instantaneously without dropping an active connection.
               </p>
             </div>
             <div className={`mt-6 pt-4 border-t flex items-center justify-between text-[11px] font-mono ${isDark ? 'border-[#131D26] text-zinc-500' : 'border-zinc-100 text-zinc-500'}`}>
@@ -584,7 +584,7 @@ export function LandingPage() {
         <div className="max-w-[1240px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <span className={isDark ? 'text-[#00DF8F]' : 'text-emerald-600'}>▲</span>
-            <span className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>Slipway Inc.</span>
+            <span className={`font-semibold ${isDark ? 'text-white' : 'text-zinc-900'}`}>PortalOps Inc.</span>
             <span className="opacity-40">|</span>
             <span>Zero-Downtime Control Plane v2.4</span>
           </div>

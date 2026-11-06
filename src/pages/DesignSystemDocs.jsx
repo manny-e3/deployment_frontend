@@ -77,10 +77,10 @@ export function DesignSystemDocs() {
               <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-[4px] bg-[#0F6E74] text-white uppercase">
                 Design System v1.0
               </span>
-              <span className="text-[12px] font-mono text-[#5E6B76]">slipway.spec</span>
+              <span className="text-[12px] font-mono text-[#5E6B76]">portalops.spec</span>
             </div>
             <h2 className="text-[20px] font-semibold text-[#17202A] tracking-tight">
-              Slipway Design System Specifications
+              PortalOps Design System Specifications
             </h2>
             <p className="text-[13px] text-[#5E6B76] mt-1 max-w-3xl leading-relaxed">
               Utilitarian, calm, hyper-focused, and unmistakably functional. Engineered to oversee mission-critical

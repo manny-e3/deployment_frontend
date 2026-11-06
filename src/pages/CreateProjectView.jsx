@@ -458,7 +458,7 @@ export function CreateProjectView() {
                     </span>
                   </div>
                   <p className="text-[12px] text-[#565f6b]">
-                    Add this public key to your repository's <strong>Settings → Deploy Keys</strong> with read-only access so Slipway can pull code:
+                    Add this public key to your repository's <strong>Settings → Deploy Keys</strong> with read-only access so PortalOps can pull code:
                   </p>
                   <div className="flex items-center gap-2">
                     <div className="flex-1 p-2 rounded-[4px] bg-[#FFFFFF] border border-[#BEDDF7] font-mono text-[11px] text-[#101d26] break-all select-all">
@@ -477,7 +477,7 @@ export function CreateProjectView() {
               ) : (
                 <div className="p-3.5 rounded-[6px] bg-[#F4F6F5] border border-[#CDD4D0] flex items-center gap-3 text-[12px] text-[#565f6b]">
                   <KeyRound className="w-4 h-4 text-[#565f6b] shrink-0" />
-                  <span>SSH deploy key not detected. Slipway will use system default authentication or token credentials.</span>
+                  <span>SSH deploy key not detected. PortalOps will use system default authentication or token credentials.</span>
                 </div>
               )}
 
@@ -651,7 +651,7 @@ export function CreateProjectView() {
               <span>SSH Key Auto-Injection</span>
             </div>
             <p>
-              Once provisioned, Slipway generates a cryptographically signed HMAC webhook secret and initiates initial checkout. Destination servers and target directories can be configured on the project details page.
+              Once provisioned, PortalOps generates a cryptographically signed HMAC webhook secret and initiates initial checkout. Destination servers and target directories can be configured on the project details page.
             </p>
           </div>
         </div>

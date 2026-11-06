@@ -316,7 +316,7 @@ export function SettingsView() {
   // General Platform State
   // ==========================================
   const [general, setGeneral] = useState({
-    instanceName: 'Slipway Control Plane',
+    instanceName: 'PortalOps Control Plane',
     defaultEnvironment: 'Production',
     concurrencyLimit: '5',
     logRetention: '30 days',
@@ -331,7 +331,7 @@ export function SettingsView() {
   }
 
   // GitHub Actions Workflow YAML Template
-  const githubActionsYaml = `name: Slipway Continuous Dispatch
+  const githubActionsYaml = `name: PortalOps Continuous Dispatch
 
 on:
   push:

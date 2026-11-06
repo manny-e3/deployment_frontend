@@ -44,7 +44,7 @@ export function ChatOpsSimulatorModal({
         type: 'header',
         text: {
           type: 'plain_text',
-          text: `[Slipway] Release Approval Required: ${projectName}`,
+          text: `[PortalOps] Release Approval Required: ${projectName}`,
           emoji: true
         }
       },
@@ -96,7 +96,7 @@ export function ChatOpsSimulatorModal({
             elements: [
               {
                 type: 'mrkdwn',
-                text: `Updated at ${new Date().toLocaleTimeString()} via Slipway 2-Way Sync`
+                text: `Updated at ${new Date().toLocaleTimeString()} via PortalOps 2-Way Sync`
               }
             ]
           }
@@ -118,7 +118,7 @@ export function ChatOpsSimulatorModal({
               type: 'TextBlock',
               size: 'Medium',
               weight: 'Bolder',
-              text: `[Slipway] Release Approval: ${projectName}`
+              text: `[PortalOps] Release Approval: ${projectName}`
             },
             {
               type: 'FactSet',
@@ -306,9 +306,9 @@ export function ChatOpsSimulatorModal({
                   {/* Slack App Identity */}
                   <div className="flex items-center gap-2">
                     <div className="w-6 h-6 rounded-[4px] bg-zinc-950 text-white flex items-center justify-center font-bold text-[10px]">
-                      SW
+                      PO
                     </div>
-                    <span className="font-bold text-[13px] text-[#101d26]">Slipway Bot</span>
+                    <span className="font-bold text-[13px] text-[#101d26]">PortalOps Bot</span>
                     <span className="text-[10px] font-mono px-1 py-0.2 bg-[#F4F6F5] text-[#565f6b] rounded">APP</span>
                     <span className="text-[11px] text-[#8F9CA7]">Today at {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
@@ -396,7 +396,7 @@ export function ChatOpsSimulatorModal({
 
                   <div className="space-y-2">
                     <h4 className="font-bold text-[15px] text-[#101d26]">
-                      [Slipway] Release Approval: {projectName}
+                      [PortalOps] Release Approval: {projectName}
                     </h4>
 
                     <div className="space-y-1 text-[12px]">
@@ -433,7 +433,7 @@ export function ChatOpsSimulatorModal({
                       </div>
                     ) : (
                       <div className="pt-2 text-[11px] text-[#565f6b] font-mono">
-                        Card synced with Slipway control plane.
+                        Card synced with PortalOps control plane.
                       </div>
                     )}
                   </div>

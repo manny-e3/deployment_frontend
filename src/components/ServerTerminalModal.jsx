@@ -42,7 +42,7 @@ export function ServerTerminalModal({
   useEffect(() => {
     if (!isOpen || !server) return
     const banner = [
-      { type: 'system', text: `Slipway Secure Shell Console v2.4 (TLS 1.3 / ${isWin ? 'WinRM' : 'OpenSSH'})` },
+      { type: 'system', text: `PortalOps Secure Shell Console v2.4 (TLS 1.3 / ${isWin ? 'WinRM' : 'OpenSSH'})` },
       { type: 'system', text: `Connected to host: ${server.hostname || server.name} [${server.address || server.port}]` },
       { type: 'system', text: `Authentication: ${server.authType || 'SSH Key'} (host key verified)` },
       { type: 'info', text: isWin ? 'Windows PowerShell 7.4 runtime ready.' : 'Linux x86_64 environment ready. Type "help" or click quick diagnostics below.' },

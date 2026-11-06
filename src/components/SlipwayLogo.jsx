@@ -32,6 +32,7 @@ export function SlipwayLogo({ size = 'md', className = '' }) {
   )
 }
 
-// Backwards-compatibility alias
+// Backwards-compatibility and brand aliases
+export const PortalOpsLogo = SlipwayLogo
 export const DeployPortalLogo = SlipwayLogo
 

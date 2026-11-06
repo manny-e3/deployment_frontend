@@ -57,13 +57,13 @@ export function DashboardSidebar() {
           <div className="flex items-center gap-2.5">
             <SlipwayLogo size="md" />
             <span className="font-semibold text-[15.5px] text-white tracking-tight">
-              Slipway
+              PortalOps
             </span>
           </div>
 
           {/* Control Plane Tag */}
           <div className="text-[9px] font-mono leading-tight text-right text-slate-300 font-semibold uppercase tracking-wider pl-1.5 border-l border-slate-700/60">
-            <div>Slipway</div>
+            <div>PortalOps</div>
             <div className="text-[8px] text-emerald-400">CONTROL</div>
             <div className="text-[8px] text-zinc-400">PLANE</div>
           </div>
@@ -157,7 +157,7 @@ export function DashboardSidebar() {
             <button
               type="button"
               onClick={handleLogout}
-              title="Sign out of Slipway"
+              title="Sign out of PortalOps"
               className="p-1.5 text-[#8F9CA7] hover:text-white rounded-[4px] hover:bg-[#1B2430] transition-colors cursor-pointer"
             >
               <LogOut className="w-4 h-4" />
