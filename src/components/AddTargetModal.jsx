@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   X,
   Server,
@@ -17,13 +17,22 @@ import {
 } from 'lucide-react'
 import { api } from '../services/api'
 
+export const FRAMEWORK_LABELS = {
+  node: 'Node.js / PM2',
+  laravel: 'PHP / Laravel',
+  react: 'Static / SPA (React / Vite)',
+  custom: 'Custom / Static',
+}
+
 export const TARGET_PRESETS = [
   {
     id: 'atomic-laravel',
     framework: 'laravel',
     label: '🔄 Atomic Symlink (Laravel)',
+    badge: 'Zero-Downtime',
     desc: 'Zero downtime /releases/[ts] + /current symlink with shared .env & storage',
     architecture: 'atomic-symlink',
+    isWindows: false,
     script: `# -------------------------------------------------------------
 # Atomic Zero-Downtime Symlink Deployment (Laravel / PHP)
 # -------------------------------------------------------------
@@ -160,8 +169,10 @@ echo "Release $RELEASE_TIMESTAMP active with ZERO downtime."`
     id: 'atomic-node',
     framework: 'node',
     label: '🔄 Atomic Symlink (Node.js)',
+    badge: 'Zero-Downtime',
     desc: 'Zero downtime /releases/[ts] + /current symlink with PM2 reload',
     architecture: 'atomic-symlink',
+    isWindows: false,
     script: `# -------------------------------------------------------------
 # Atomic Zero-Downtime Symlink Deployment (Node.js / Express)
 # -------------------------------------------------------------
@@ -216,8 +227,10 @@ echo "Atomic switch complete. PM2 workers drained and reloaded with zero dropped
     id: 'cpanel-sftp',
     framework: 'cpanel',
     label: '📁 cPanel Pure SFTP Sync',
+    badge: 'Zero-Shell',
     desc: 'Direct SFTP transfer without remote shell execution (resolves "Unable to exec")',
     architecture: 'cpanel-sftp',
+    isWindows: false,
     script: `# -------------------------------------------------------------
 # cPanel Pure SFTP Sync (Zero-Shell Execution)
 # Resolves: SSH connection failed: Unable to exec restriction
@@ -232,98 +245,80 @@ echo "SFTP sync stream initialized directly to target root."
 echo "Zero remote shell execution required. Pure SFTP payload transfer active."`
   },
   {
-    id: 'docker-compose',
-    framework: 'docker',
-    label: '🐳 Docker Remote Compose',
-    desc: 'Connects directly to Docker daemon, pulls images and deploys compose',
-    architecture: 'docker',
+    id: 'custom',
+    framework: 'custom',
+    label: '📄 Custom Shell Hook',
+    badge: 'Universal',
+    desc: 'Generic script deployment with full lifecycle hook freedom',
+    architecture: 'custom',
+    isWindows: false,
     script: `# -------------------------------------------------------------
-# Remote Docker Daemon Target (Docker API / Compose)
-# Connects directly to tcp://:2376 or SSH docker socket
+# Custom Target Deployment Hook
 # -------------------------------------------------------------
-echo "Pulling latest images from container registry..."
-docker compose pull || true
-
-echo "Applying zero-downtime rolling update with healthcheck..."
-docker compose up -d --remove-orphans
-
-echo "Verifying container health status..."
-docker compose ps`
+echo "Executing custom deployment hook at $(date)..."
+# Add your custom build, migration, or process restart commands here:
+echo "Custom deployment step completed successfully."`
   },
   {
     id: 'react-spa',
     framework: 'react',
     label: 'React (Vite / CRA) SPA',
+    badge: 'Vite / Nginx',
     desc: 'Builds app into dist/, protects source files, and routes SPA',
     architecture: 'standard',
-    script: `# 1. Ensure modern Node.js (Node 20+ or 22+ required for Vite / Rolldown styleText)
-export NO_UPDATE_NOTIFIER=1
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+    isWindows: false,
+    script: `# ==============================================================================
+# 🚀 REACT / VITE SPA AUTOMATED RELEASE HOOK
+# ==============================================================================
 
-# Switch to modern Node (22 or 20) or install Node 20 LTS if only v18 is present
-nvm use 22 2>/dev/null || nvm use 20 2>/dev/null || nvm install 20 2>/dev/null || true
-
-# If NVM was bypassed, pick newest installed version from disk
-for d in $(ls -d $HOME/.nvm/versions/node/* 2>/dev/null | sort -V -r); do
-  if [ -d "$d/bin" ]; then
-    export PATH="$d/bin:$PATH"
+# 1. Discover modern Node.js 22/20 & npm (Hostinger, cPanel, NVM, Linux VPS)
+for p in /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin; do
+  if [ -d "$p" ]; then
+    export PATH="$p:$PATH"
     break
   fi
 done
-for p in /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /usr/local/bin /usr/bin; do
-  [ -d "$p" ] && export PATH="$PATH:$p"
-done
+for p in "$HOME/.local/bin" /usr/local/bin; do [ -d "$p" ] && export PATH="$p:$PATH"; done
+if [ -d "$HOME/.nvm" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  if [ -s "$NVM_DIR/nvm.sh" ]; then
+    . "$NVM_DIR/nvm.sh" 2>/dev/null || true
+    nvm use 22 2>/dev/null || nvm use 20 2>/dev/null || true
+  fi
+fi
 
-# Resource constraints for shared hosting (prevents Rust/Rayon thread exhaustion panic)
-export RAYON_NUM_THREADS=1
-export ROLLDOWN_WORKERS=1
-export UV_THREADPOOL_SIZE=1
-export NODE_OPTIONS="--max-old-space-size=512"
-
-echo "Building with Node: $(node -v) | npm: $(npm -v)"
-
-# Neutralize hardcoded subdirectory router base overrides for root domain
-case "$(basename "$(pwd)")" in
-  public_html|html|www|public|htdocs|web)
-    sed -i -E '/^[[:space:]]*VITE_ROUTER_BASE[[:space:]]*=/d' .env .env.production .env.local 2>/dev/null || true
-    ;;
-esac
-
-# 2. Install dependencies & build production assets with relative base
+# 2. Install dependencies & build production bundle
+export NO_UPDATE_NOTIFIER=1
 npm ci 2>/dev/null || npm install
-RAYON_NUM_THREADS=1 npm run build -- --base=./
+npm run build
 
-# 3. Copy built files from dist/ directly to the web root
-cp -rf dist/* .
+# 3. Copy compiled static bundle from dist/ to web root
+if [ -d "dist" ]; then
+  cp -rf dist/* .
+fi
 
-# 4. Standard React SPA routing and source protection
+# 4. Standard SPA client-side fallback routing (.htaccess)
 cat << 'HTACCESS' > .htaccess
 <IfModule mod_rewrite.c>
   RewriteEngine On
-
-  # Block public access to private source code
-  RewriteRule ^(src|\.git|node_modules|package.*\.json|vite\.config\.js|\.env.*|README\.md) - [F,L]
-
-  # Allow direct access to existing files and directories
-  RewriteCond %{REQUEST_FILENAME} -f [OR]
-  RewriteCond %{REQUEST_FILENAME} -d
-  RewriteRule ^ - [L]
-
-  # Direct access to index.html
+  RewriteBase /
   RewriteRule ^index\.html$ - [L]
-
-  # Route all other URLs to index.html for SPA client-side routing
-  RewriteRule . index.html [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
 </IfModule>
-HTACCESS`
+HTACCESS
+
+echo "✅ React SPA build & routing deployment completed successfully."`
   },
   {
     id: 'react-build',
     framework: 'react',
     label: '⚡ React (Build Only)',
+    badge: 'Compile Only',
     desc: 'Runs npm install && npm run build into dist/',
     architecture: 'standard',
+    isWindows: false,
     script: `export NO_UPDATE_NOTIFIER=1
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
@@ -348,8 +343,10 @@ RAYON_NUM_THREADS=1 npm run build`
     id: 'laravel',
     framework: 'laravel',
     label: 'Laravel + Migrations',
+    badge: 'In-Place',
     desc: 'Routes to public/, auto-creates .env, installs dependencies & migrates',
     architecture: 'standard',
+    isWindows: false,
     script: `# 1. Immediately create root index.php and .htaccess to eliminate LiteSpeed "Index of /"
 cat << 'INDEX_PHP' > index.php
 <?php
@@ -428,8 +425,10 @@ fi`
     id: 'windows-node',
     framework: 'node',
     label: '🪟 Windows Node.js API (XAMPP / Apache)',
+    badge: 'Windows',
     desc: 'Runs npm install, migrations, background Scheduled Task runner, and Apache reverse proxy',
     architecture: 'windows-node',
+    isWindows: true,
     script: [
       '# -------------------------------------------------------------',
       '# Windows Server / XAMPP Deployment (Node.js API)',
@@ -500,8 +499,10 @@ fi`
     id: 'windows-spa',
     framework: 'react',
     label: '🪟 Windows React / Vite SPA (XAMPP / Apache)',
+    badge: 'Windows',
     desc: 'Compiles production bundle, syncs dist/ into Apache root, and enables client-side routing',
     architecture: 'windows-spa',
+    isWindows: true,
     script: [
       '# -------------------------------------------------------------',
       '# Windows Server / XAMPP Deployment (React / Vite / Vue / SPA)',
@@ -577,8 +578,10 @@ fi`
     id: 'windows-laravel',
     framework: 'laravel',
     label: '🪟 Windows Laravel / PHP (XAMPP / Apache)',
+    badge: 'Windows',
     desc: 'Composer install, artisan migrate, and Apache .htaccess routing for Windows XAMPP',
     architecture: 'windows-php',
+    isWindows: true,
     script: `# -------------------------------------------------------------
 # Windows Server / XAMPP Deployment (Laravel / PHP)
 # -------------------------------------------------------------
@@ -609,8 +612,10 @@ echo "Windows Laravel deployment complete."`
     id: 'node',
     framework: 'node',
     label: '🟢 Node.js / Express',
+    badge: 'In-Place',
     desc: 'Installs dependencies and restarts daemon via PM2',
     architecture: 'standard',
+    isWindows: false,
     script: `export NO_UPDATE_NOTIFIER=1
 if [ -d "/opt/alt/alt-nodejs22/root/usr/bin" ]; then
   export PATH="/opt/alt/alt-nodejs22/root/usr/bin:$PATH"
@@ -626,6 +631,55 @@ npm ci 2>/dev/null || npm install
 pm2 restart all || pm2 start index.js --name "app" || true`
   }
 ]
+
+export const isWindowsServer = (server) => {
+  if (!server) return false
+  const name = (server.name || '').toLowerCase()
+  const host = (server.host || '').toLowerCase()
+  const username = (server.username || '').toLowerCase()
+  const port = Number(server.port)
+  return (
+    server.osType === 'WINDOWS' ||
+    server.operatingSystem?.toLowerCase().includes('windows') ||
+    port === 5985 ||
+    port === 5986 ||
+    username === 'administrator' ||
+    name.includes('windows') ||
+    name.includes('win-') ||
+    name.includes('xampp') ||
+    name.includes('fmdq') ||
+    host === '10.10.15.59' ||
+    host === '101-php-01.fmdqgroup.com'
+  )
+}
+
+export const selectBestPresetForServer = (server, currentFramework) => {
+  if (server?.serverType === 'CPANEL_SFTP' || server?.iconType === 'cpanel' || server?.host === 'travaiq.com') {
+    return TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
+  }
+  const isWin = isWindowsServer(server)
+  if (isWin) {
+    if (currentFramework === 'node') return TARGET_PRESETS.find((p) => p.id === 'windows-node')
+    if (currentFramework === 'react') return TARGET_PRESETS.find((p) => p.id === 'windows-spa')
+    if (currentFramework === 'laravel') return TARGET_PRESETS.find((p) => p.id === 'windows-laravel')
+    return TARGET_PRESETS.find((p) => p.isWindows) || TARGET_PRESETS[0]
+  }
+
+  // Linux / Unix server
+  if (currentFramework === 'node') {
+    return TARGET_PRESETS.find((p) => p.id === 'atomic-node') || TARGET_PRESETS.find((p) => p.id === 'node')
+  }
+  if (currentFramework === 'laravel') {
+    return TARGET_PRESETS.find((p) => p.id === 'atomic-laravel') || TARGET_PRESETS.find((p) => p.id === 'laravel')
+  }
+  if (currentFramework === 'react') {
+    return TARGET_PRESETS.find((p) => p.id === 'react-spa') || TARGET_PRESETS.find((p) => p.id === 'react-build')
+  }
+  if (currentFramework === 'custom') {
+    return TARGET_PRESETS.find((p) => p.id === 'custom')
+  }
+  return TARGET_PRESETS.find((p) => !p.isWindows && p.framework === currentFramework) || TARGET_PRESETS.find((p) => !p.isWindows) || TARGET_PRESETS[0]
+}
 
 export function AddTargetModal({
   isOpen,
@@ -646,45 +700,40 @@ export function AddTargetModal({
   const [healthCheckUrl, setHealthCheckUrl] = useState('')
   const [autoRollbackOnFailure, setAutoRollbackOnFailure] = useState(true)
   const [requiresApproval, setRequiresApproval] = useState(false)
-  const [selectedPresetId, setSelectedPresetId] = useState('react-spa')
+  const [selectedPresetId, setSelectedPresetId] = useState('')
   const [isAtomicSymlink, setIsAtomicSymlink] = useState(false)
+  const [showAllPresets, setShowAllPresets] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
 
-  const isWindowsServer = (server) => {
-    if (!server) return false
-    const name = (server.name || '').toLowerCase()
-    const host = (server.host || '').toLowerCase()
-    return (
-      name.includes('windows') ||
-      name.includes('fmdq') ||
-      name.includes('xampp') ||
-      host === '10.10.15.59' ||
-      host === '101-php-01.fmdqgroup.com'
-    )
-  }
+  const selectedServer = servers.find((s) => s.id === serverId)
+  const isWindows = isWindowsServer(selectedServer)
 
-  const selectBestPresetForServer = (server, currentFramework) => {
-    if (server?.serverType === 'CPANEL_SFTP' || server?.iconType === 'cpanel' || server?.host === 'travaiq.com') {
-      return TARGET_PRESETS.find((p) => p.id === 'cpanel-sftp')
-    }
-    if (server?.serverType === 'DOCKER' || server?.iconType === 'docker') {
-      return TARGET_PRESETS.find((p) => p.id === 'docker-compose')
-    }
-    if (isWindowsServer(server)) {
-      if (currentFramework === 'node') {
-        return TARGET_PRESETS.find((p) => p.id === 'windows-node')
+  // Filter presets compatible with current server OS and project framework
+  const compatiblePresets = useMemo(() => {
+    return TARGET_PRESETS.filter((preset) => {
+      // 1. Never show Docker presets
+      if (preset.framework === 'docker' || preset.architecture === 'docker') return false
+
+      // 2. Strict OS match: Linux server never shows Windows; Windows server never shows Linux
+      if (isWindows && !preset.isWindows) return false
+      if (!isWindows && preset.isWindows) return false
+
+      // 3. Framework match: if not showing all recipes, filter strictly by projectFramework
+      if (!showAllPresets && projectFramework) {
+        if (projectFramework === 'custom') {
+          return preset.framework === 'custom' || preset.framework === 'any'
+        }
+        return preset.framework === projectFramework
       }
-      if (currentFramework === 'react') {
-        return TARGET_PRESETS.find((p) => p.id === 'windows-spa')
-      }
-      if (currentFramework === 'laravel') {
-        return TARGET_PRESETS.find((p) => p.id === 'windows-laravel')
-      }
-      return TARGET_PRESETS.find((p) => p.id === 'windows-node') || TARGET_PRESETS.find((p) => p.id === 'windows-spa')
-    }
-    return TARGET_PRESETS.find((p) => p.framework === currentFramework) || TARGET_PRESETS[0]
-  }
+
+      return true
+    })
+  }, [isWindows, projectFramework, showAllPresets])
+
+  const displayedPresets = compatiblePresets.length > 0
+    ? compatiblePresets
+    : TARGET_PRESETS.filter((p) => isWindows ? p.isWindows : !p.isWindows)
 
   const applyPresetForServer = (srv) => {
     const chosen = selectBestPresetForServer(srv, projectFramework)
@@ -707,13 +756,12 @@ export function AddTargetModal({
     setRequiresApproval(false)
 
     // Automatically match the preset for the project's selected framework
-    const matchedPreset =
-      TARGET_PRESETS.find((p) => p.framework === projectFramework) ||
-      TARGET_PRESETS[0]
-
-    setSelectedPresetId(matchedPreset.id)
-    setPostDeploy(matchedPreset.script)
-    setIsAtomicSymlink(matchedPreset.architecture === 'atomic-symlink')
+    const matchedPreset = selectBestPresetForServer(null, projectFramework)
+    if (matchedPreset) {
+      setSelectedPresetId(matchedPreset.id)
+      setPostDeploy(matchedPreset.script)
+      setIsAtomicSymlink(matchedPreset.architecture === 'atomic-symlink')
+    }
 
     const fetchServers = async () => {
       setLoadingServers(true)
@@ -931,7 +979,7 @@ export function AddTargetModal({
               >
                 {servers.map((s) => (
                   <option key={s.id} value={s.id}>
-                    {s.name} ({s.username}@{s.host}:{s.port || 22}) {s.serverType === 'CPANEL_SFTP' ? '· [cPanel SFTP]' : s.serverType === 'DOCKER' ? '· [Docker Engine]' : ''}
+                    {s.name} ({s.username}@{s.host}:{s.port || 22}) {s.serverType === 'CPANEL_SFTP' ? '· [cPanel SFTP]' : isWindowsServer(s) ? '· [Windows Server]' : '· [Linux VPS]'}
                   </option>
                 ))}
               </select>
@@ -946,16 +994,6 @@ export function AddTargetModal({
                     <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#C2410C]" />
                     <div>
                       <span className="font-bold">cPanel Pure SFTP Target:</span> Transfers pre-compiled assets cleanly over SFTP directly into the web root, completely resolving the <em>"SSH connection failed: Unable to exec"</em> restriction without requiring shell execution.
-                    </div>
-                  </div>
-                )
-              }
-              if (currentServer && (currentServer.serverType === 'DOCKER' || currentServer.iconType === 'docker')) {
-                return (
-                  <div className="mt-2 p-2.5 bg-[#E0F2FE] border border-[#BAE6FD] rounded-[6px] flex items-start gap-2 text-[11px] text-[#0369A1]">
-                    <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#0284C7]" />
-                    <div>
-                      <span className="font-bold">Remote Docker Engine Target:</span> Connects directly to Docker daemon for zero-downtime rolling container updates and image tag rollouts.
                     </div>
                   </div>
                 )
@@ -1020,16 +1058,47 @@ export function AddTargetModal({
           {/* Framework & Deployment Preset */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b]">
-                DEPLOYMENT PRESET
-              </label>
-              <span className="text-[10px] text-[#565f6b] font-mono">
-                Click preset to load script
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b]">
+                  DEPLOYMENT RECIPE
+                </label>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                  <CheckCircle2 className="w-3 h-3 text-[#2E8B57]" />
+                  Auto-Matched
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllPresets(!showAllPresets)}
+                className="text-[10px] text-[#005459] hover:underline font-mono cursor-pointer"
+              >
+                {showAllPresets ? 'Show recommended only' : `Show all ${isWindows ? 'Windows' : 'Linux'} recipes`}
+              </button>
+            </div>
+
+            {/* Smart Stack Banner */}
+            <div className="p-2.5 bg-[#FAFBFB] border border-[#E2E7E4] rounded-[6px] mb-2 text-[11px] text-[#565f6b] flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[#101d26]">Project Stack:</span>
+                <span className="px-2 py-0.5 rounded font-mono font-bold bg-[#E2F0FD] text-[#005459] border border-[#BEDDF7]">
+                  {FRAMEWORK_LABELS[projectFramework] || projectFramework}
+                </span>
+                <span className="text-[#8F9CA7]">•</span>
+                <span className="font-semibold text-[#101d26]">Server OS:</span>
+                <span className={`px-2 py-0.5 rounded font-mono font-semibold ${isWindows ? 'bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]' : 'bg-[#EAF5EE] text-[#2E8B57] border-[#B8E0C5]'}`}>
+                  {isWindows ? 'Windows Server' : 'Linux / Unix VPS'}
+                </span>
+              </div>
+              <span className="text-[10px] text-[#2E8B57] font-medium hidden sm:inline">
+                ✓ Ready to deploy • No need to select framework again
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              {TARGET_PRESETS.map((preset) => {
+
+            {/* Filtered Compatible Presets Grid */}
+            <div className={`grid ${displayedPresets.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
+              {displayedPresets.map((preset) => {
                 const isSelected = selectedPresetId === preset.id
+                const isRecommended = preset.architecture === 'atomic-symlink' || preset.id === 'react-spa' || preset.id === 'custom' || preset.id.startsWith('windows')
                 return (
                   <button
                     key={preset.id}
@@ -1045,28 +1114,25 @@ export function AddTargetModal({
                       <span className={isSelected ? 'text-[#005459]' : 'text-[#101d26]'}>
                         {preset.label}
                       </span>
-                      {preset.architecture === 'atomic-symlink' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
-                          Zero-Downtime
-                        </span>
-                      )}
-                      {preset.architecture === 'cpanel-sftp' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
-                          Zero-Shell
-                        </span>
-                      )}
-                      {preset.architecture === 'docker' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
-                          Daemon
-                        </span>
-                      )}
-                      {preset.architecture.startsWith('windows') && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
-                          Windows
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isRecommended && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#2E8B57] border border-[#B8E0C5]">
+                            Recommended
+                          </span>
+                        )}
+                        {preset.architecture === 'atomic-symlink' && (
+                          <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E2F0FD] text-[#005459] border border-[#BEDDF7]">
+                            Zero-Downtime
+                          </span>
+                        )}
+                        {preset.architecture === 'cpanel-sftp' && (
+                          <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
+                            Zero-Shell
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="text-[10px] text-[#565f6b] leading-tight mt-0.5">
+                    <div className="text-[10px] text-[#565f6b] leading-tight mt-1">
                       {preset.desc}
                     </div>
                   </button>

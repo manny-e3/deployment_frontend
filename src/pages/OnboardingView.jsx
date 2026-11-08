@@ -70,13 +70,13 @@ export function OnboardingView() {
     setStep(2)
   }
 
-  const handleOnboardTeam = (e) => {
+  const handleOnboardTeam = async (e) => {
     e.preventDefault()
     // Filter only members with email filled
     const validMembers = members.filter((m) => m.email && m.email.trim())
 
     if (validMembers.length > 0) {
-      const generated = onboardMembers(validMembers)
+      const generated = await onboardMembers(validMembers)
       setOnboardedList(generated)
     }
 

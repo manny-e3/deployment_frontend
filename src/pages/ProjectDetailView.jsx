@@ -53,6 +53,7 @@ import { DeleteProjectModal } from '../components/DeleteProjectModal'
 import { EditTargetModal } from '../components/EditTargetModal'
 import { RollbackModal } from '../components/RollbackModal'
 import { PipelineStepper } from '../components/PipelineStepper'
+import { DeploymentDiagnostics } from '../components/DeploymentDiagnostics'
 import { ApprovalModal } from '../components/ApprovalModal'
 import { CommitDiffModal } from '../components/CommitDiffModal'
 import { MaintenanceModeModal } from '../components/MaintenanceModeModal'
@@ -2110,6 +2111,13 @@ export function ProjectDetailView() {
                 />
               </div>
 
+              {/* Intelligent Root Cause Diagnostics Banner */}
+              {streamStatus === 'FAILED' && (
+                <div className="p-4 bg-[#11161B] border-t border-[#24313E]">
+                  <DeploymentDiagnostics logs={logs} exitCode={exitCode} />
+                </div>
+              )}
+
               {/* Embedded Dark Terminal Window */}
               <div className="p-4 bg-[#11161B] border-t border-[#24313E] font-mono text-[12px] text-[#D1D7DC]">
                 {/* Terminal Window Header Bar with View Controls */}
@@ -2318,6 +2326,7 @@ export function ProjectDetailView() {
           onClose={() => setEditingTarget(null)}
           projectId={projectId}
           target={editingTarget}
+          projectFramework={currentFramework}
           onTargetUpdated={() => {
             refreshProject()
             setEditingTarget(null)

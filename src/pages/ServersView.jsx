@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Server,
   Plus,
@@ -30,6 +31,7 @@ import {
   Pencil,
   Monitor,
   MoreVertical,
+  Globe,
 } from 'lucide-react'
 import { AddServerModal, WindowsLogo, LinuxLogo } from '../components/AddServerModal'
 import { ServerTerminalModal } from '../components/ServerTerminalModal'
@@ -39,7 +41,8 @@ import { can } from '../utils/permissions'
 import { api, ApiError } from '../services/api'
 
 export function ServersView() {
-  const { role } = useAuth()
+  const { role, user, organizationName } = useAuth()
+  const teamName = user?.name || organizationName || 'Your'
   const [servers, setServers] = useState([])
   const [loading, setLoading] = useState(true)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -84,9 +87,14 @@ export function ServersView() {
         const detectedVersion = s?.gitVersion || (isWin ? 'PowerShell 7.4' : 'git 2.43.0')
 
         return {
+          ...s,
           id: s?.id,
           name: s?.name || (isWin ? 'Windows Server' : 'Linux Server'),
+          host: s?.host || '',
           hostname: s?.host || '',
+          publicKey: s?.publicKey,
+          setupToken: s?.setupToken,
+          setupCompletedAt: s?.setupCompletedAt,
           osType: detectedType,
           serverType: detectedType,
           protocol: detectedProtocol,
@@ -239,107 +247,125 @@ export function ServersView() {
   return (
     <div className="space-y-6">
       {/* 1. Header & Primary Action Controls */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2.5">
-            <h1 className="text-[26px] font-bold text-[#101d26] tracking-tight leading-tight">
-              Servers
-            </h1>
+          <h1 className="text-2xl font-bold text-[#101d26] dark:text-white tracking-tight">
+            Servers
+          </h1>
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+            <Link to="/dashboard" className="hover:text-zinc-900 dark:hover:text-zinc-200 transition-colors">
+              Dashboard
+            </Link>
+            <span>/</span>
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium">Servers</span>
           </div>
-          <p className="text-[12px] text-[#565f6b] mt-0.5">
-            Manage Linux (OpenSSH) and Windows Server (WinRM / OpenSSH) deployment nodes.
-          </p>
         </div>
 
-        {/* Filter controls & Add button */}
+        {/* Filter controls & Create button */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#565f6b]" />
-            <input
-              type="text"
-              placeholder="Search fleet..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-[34px] pl-8 pr-3 text-[12px] bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[#101d26] placeholder-[#565f6b] focus:outline-none focus:border-[#005459] w-[160px] md:w-[190px]"
-            />
-          </div>
+          {servers.length > 0 && (
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#565f6b]" />
+              <input
+                type="text"
+                placeholder="Search fleet..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-[34px] pl-8 pr-3 text-[12px] bg-[#FFFFFF] dark:bg-[#060D10] border border-[#CDD4D0] dark:border-zinc-700 rounded-[6px] text-[#101d26] dark:text-white placeholder-[#565f6b] focus:outline-none focus:border-[#005459] w-[160px] md:w-[190px]"
+              />
+            </div>
+          )}
 
-
-
-          {/* Add Server */}
           {can(role, 'servers:manage') && (
-            <button
-              type="button"
-              onClick={() => setIsAddModalOpen(true)}
-              className="h-[34px] px-3 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer ml-1"
+            <Link
+              to="/servers/create"
+              className="h-[34px] px-3.5 rounded-[6px] bg-[#005459] hover:bg-[#084246] active:bg-[#003538] text-white text-[12px] font-semibold flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer ml-1"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Add server</span>
-            </button>
+              <span>Create server</span>
+            </Link>
           )}
         </div>
       </div>
 
-      {/* Active Fleet Directory Table */}
-      <div className="bg-[#FFFFFF] border border-[#CDD4D0] rounded-[8px] overflow-hidden shadow-xs relative">
-        {/* Table Header Bar */}
-        <div className="px-5 py-3 border-b border-[#E2E7E4] flex items-center justify-between bg-[#FAFBFB]">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[11px] font-bold text-[#101d26] uppercase tracking-wider">
-              ACTIVE FLEET DIRECTORY
-            </span>
-            <span className="font-mono text-[11px] text-[#565f6b]">
-              ({filteredServers.length} shown)
-            </span>
-          </div>
-          <div className="flex items-center gap-3 text-[12px] text-[#565f6b]">
-            <button
-              type="button"
-              onClick={fetchServers}
-              className="flex items-center gap-1 hover:text-[#101d26] cursor-pointer"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-              <span>Refresh</span>
-            </button>
-          </div>
+      {/* Loading State */}
+      {loading ? (
+        <div className="bg-[#FFFFFF] dark:bg-[#0B1317] border border-[#CDD4D0] dark:border-zinc-800 rounded-[8px] p-12 text-center text-[#565f6b] font-mono">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#005459] mb-2" />
+          <span>Loading server infrastructure...</span>
         </div>
+      ) : servers.length === 0 ? (
+        /* Empty State matching Ploi UI (Image 1) */
+        <div className="max-w-xl mx-auto my-8 bg-[#FFFFFF] dark:bg-[#0B1317] border border-[#E2E7E4] dark:border-zinc-800 rounded-xl p-8 sm:p-12 text-center shadow-xs">
+          <div className="w-12 h-12 rounded-full bg-[#EBF3FC] text-[#005459] flex items-center justify-center mx-auto mb-4 border border-[#BEDDF7]">
+            <Globe className="w-6 h-6 stroke-[2]" />
+          </div>
+          <h2 className="text-lg sm:text-xl font-bold text-[#101d26] dark:text-white mb-2">
+            {teamName}'s Team doesn't have any servers yet
+          </h2>
+          <p className="text-xs sm:text-sm text-[#565f6b] dark:text-zinc-400 max-w-md mx-auto mb-6 leading-relaxed">
+            Currently this team does not own any servers. Luckily PortalOps makes this real easy for you to do.
+          </p>
+          <Link
+            to="/servers/create"
+            className="inline-flex items-center justify-center px-6 py-2.5 rounded-lg bg-[#005459] hover:bg-[#084246] active:bg-[#003538] text-white text-xs sm:text-sm font-semibold transition-colors shadow-xs"
+          >
+            Create server
+          </Link>
+        </div>
+      ) : (
+        /* Active Fleet Directory Table */
+        <div className="bg-[#FFFFFF] dark:bg-[#0B1317] border border-[#CDD4D0] dark:border-zinc-800 rounded-[8px] overflow-hidden shadow-xs relative">
+          {/* Table Header Bar */}
+          <div className="px-5 py-3 border-b border-[#E2E7E4] dark:border-zinc-800 flex items-center justify-between bg-[#FAFBFB] dark:bg-[#060D10]">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[11px] font-bold text-[#101d26] dark:text-white uppercase tracking-wider">
+                ACTIVE FLEET DIRECTORY
+              </span>
+              <span className="font-mono text-[11px] text-[#565f6b]">
+                ({filteredServers.length} shown)
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-[12px] text-[#565f6b]">
+              <button
+                type="button"
+                onClick={fetchServers}
+                className="flex items-center gap-1 hover:text-[#101d26] dark:hover:text-white cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+            </div>
+          </div>
 
-        {/* Table Content */}
-        <div className="overflow-x-auto min-h-[220px]">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-[#E2E7E4] bg-[#F4F6F5] text-[10px] font-mono font-semibold text-[#565f6b] uppercase tracking-wider">
-                <th className="py-2.5 px-5">NODE NAME &amp; OS</th>
-                <th className="py-2.5 px-4">HOST &amp; PROTOCOL</th>
-                <th className="py-2.5 px-4">AUTH METHOD</th>
-                <th className="py-2.5 px-4">PIPELINE ALLOCATION</th>
-                <th className="py-2.5 px-4">HOST TELEMETRY</th>
-                <th className="py-2.5 px-5 text-right">ACTION</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[#E2E7E4] text-[12px]">
-              {loading ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#565f6b] font-mono">
-                    <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#005459] mb-2" />
-                    <span>Loading server infrastructure...</span>
-                  </td>
+          {/* Table Content */}
+          <div className="overflow-x-auto min-h-[220px]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-[#E2E7E4] dark:border-zinc-800 bg-[#F4F6F5] dark:bg-[#060D10] text-[10px] font-mono font-semibold text-[#565f6b] uppercase tracking-wider">
+                  <th className="py-2.5 px-5">NODE NAME &amp; OS</th>
+                  <th className="py-2.5 px-4">HOST &amp; PROTOCOL</th>
+                  <th className="py-2.5 px-4">AUTH METHOD</th>
+                  <th className="py-2.5 px-4">PIPELINE ALLOCATION</th>
+                  <th className="py-2.5 px-4">HOST TELEMETRY</th>
+                  <th className="py-2.5 px-5 text-right">ACTION</th>
                 </tr>
-              ) : filteredServers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#565f6b]">
-                    <div className="w-10 h-10 rounded-[6px] bg-[#E2F0FD] text-[#005459] flex items-center justify-center mx-auto mb-2">
-                      <Server className="w-5 h-5" />
-                    </div>
-                    <div className="font-semibold text-[#101d26]">No servers matching filter</div>
-                    <div className="text-[12px] text-[#565f6b] mt-0.5">
-                      Click "+ Add server" to register a Linux or Windows Server deployment target.
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                filteredServers.map((srv, idx) => (
+              </thead>
+              <tbody className="divide-y divide-[#E2E7E4] dark:divide-zinc-800 text-[12px]">
+                {filteredServers.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-[#565f6b]">
+                      <div className="w-10 h-10 rounded-[6px] bg-[#E2F0FD] text-[#005459] flex items-center justify-center mx-auto mb-2">
+                        <Server className="w-5 h-5" />
+                      </div>
+                      <div className="font-semibold text-[#101d26] dark:text-white">No servers matching filter</div>
+                      <div className="text-[12px] text-[#565f6b] mt-0.5">
+                        Try adjusting your search query or clear the filter.
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredServers.map((srv, idx) => (
                   <tr key={srv.id} className="hover:bg-[#FAFBFB] transition-colors">
                     {/* Node Name & OS */}
                     <td className="py-3 px-5">
@@ -609,6 +635,7 @@ export function ServersView() {
           <span>Showing {filteredServers.length} of {servers.length} total hosts</span>
         </div>
       </div>
+      )}
 
       {/* Add / Edit Server Modal */}
       <AddServerModal

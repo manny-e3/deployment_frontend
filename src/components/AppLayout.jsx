@@ -4,6 +4,7 @@ import { DashboardSidebar } from './DashboardSidebar'
 import { DashboardTopBar } from './DashboardTopBar'
 import { ErrorBoundary } from './ErrorBoundary'
 import { CommandPaletteModal } from './CommandPaletteModal'
+import { TrialBanner } from './TrialBanner'
 
 export function AppLayout() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
@@ -34,19 +35,24 @@ export function AppLayout() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-[#07090D] text-zinc-900 dark:text-zinc-100 flex font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-emerald-500/20 dark:selection:text-emerald-300 transition-colors duration-200">
-      {/* 1. Sidebar Navigation */}
-      <DashboardSidebar />
+    <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-[#07090D] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-emerald-500/20 dark:selection:text-emerald-300 transition-colors duration-200">
+      {/* 0. Full-Width Trial Alert Banner */}
+      <TrialBanner />
 
-      {/* 2. Main Content Canvas */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <DashboardTopBar onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+      <div className="flex-1 flex min-h-0">
+        {/* 1. Sidebar Navigation */}
+        <DashboardSidebar />
 
-        <main className="flex-1 p-6 md:p-8 max-w-[1600px] w-full mx-auto">
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
-        </main>
+        {/* 2. Main Content Canvas */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <DashboardTopBar onOpenCommandPalette={() => setIsCommandPaletteOpen(true)} />
+
+          <main className="flex-1 p-6 md:p-8 max-w-[1600px] w-full mx-auto">
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </main>
+        </div>
       </div>
 
       {/* 3. Global Command Palette Modal */}

@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { api } from '../services/api'
 import { PipelineStepper } from './PipelineStepper'
+import { DeploymentDiagnostics } from './DeploymentDiagnostics'
 
 export function LogModal({
   isOpen,
@@ -422,6 +423,13 @@ export function LogModal({
             )}
           </div>
         </div>
+
+        {/* Intelligent Failure Diagnostics Banner */}
+        {status === 'FAILED' && (
+          <div className="px-4 pt-3 pb-1 bg-[#101720] border-b border-[#24313E] shrink-0">
+            <DeploymentDiagnostics logs={logs} />
+          </div>
+        )}
 
         {/* Log Lines Container */}
         <div className="p-4 leading-[21px] text-[#D1D7DC] overflow-y-auto flex-1 space-y-0.5 terminal-scroll select-text font-mono text-[12px]">

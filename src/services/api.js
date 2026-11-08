@@ -136,6 +136,8 @@ export async function api(path, options = {}) {
   const isAuthCall = [
     '/auth/login',
     '/auth/register',
+    '/auth/confirm-email',
+    '/auth/resend-confirmation',
     '/auth/accept-invite',
     '/auth/refresh',
     '/auth/forgot-password',

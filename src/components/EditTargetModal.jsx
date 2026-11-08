@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   X,
   Server,
@@ -8,15 +8,16 @@ import {
   Loader2,
   Edit3,
   Check,
+  CheckCircle2,
   Activity,
   ShieldAlert,
   RefreshCw,
   Info,
 } from 'lucide-react'
 import { api } from '../services/api'
-import { TARGET_PRESETS } from './AddTargetModal'
+import { TARGET_PRESETS, isWindowsServer, FRAMEWORK_LABELS } from './AddTargetModal'
 
-export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUpdated }) {
+export function EditTargetModal({ isOpen, onClose, projectId, target, projectFramework = 'react', onTargetUpdated }) {
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
   const [branch, setBranch] = useState('main')
@@ -27,9 +28,37 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
   const [requiresApproval, setRequiresApproval] = useState(false)
   const [selectedPresetId, setSelectedPresetId] = useState(null)
   const [isAtomicSymlink, setIsAtomicSymlink] = useState(false)
+  const [showAllPresets, setShowAllPresets] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
+
+  const isWindows = isWindowsServer(target?.server)
+
+  const compatiblePresets = useMemo(() => {
+    return TARGET_PRESETS.filter((preset) => {
+      // 1. Docker excluded
+      if (preset.framework === 'docker' || preset.architecture === 'docker') return false
+
+      // 2. Strict OS match
+      if (isWindows && !preset.isWindows) return false
+      if (!isWindows && preset.isWindows) return false
+
+      // 3. Framework match
+      if (!showAllPresets && projectFramework) {
+        if (projectFramework === 'custom') {
+          return preset.framework === 'custom' || preset.framework === 'any'
+        }
+        return preset.framework === projectFramework
+      }
+
+      return true
+    })
+  }, [isWindows, projectFramework, showAllPresets])
+
+  const displayedPresets = compatiblePresets.length > 0
+    ? compatiblePresets
+    : TARGET_PRESETS.filter((p) => isWindows ? p.isWindows : !p.isWindows)
 
   useEffect(() => {
     if (target && isOpen) {
@@ -275,16 +304,47 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
           {/* Framework & Deployment Preset */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b]">
-                DEPLOYMENT PRESET
-              </label>
-              <span className="text-[10px] text-[#565f6b] font-mono">
-                Click preset to replace script
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] font-mono uppercase tracking-wider font-semibold text-[#565f6b]">
+                  DEPLOYMENT RECIPE
+                </label>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono font-medium bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
+                  <CheckCircle2 className="w-3 h-3 text-[#2E8B57]" />
+                  Auto-Matched
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAllPresets(!showAllPresets)}
+                className="text-[10px] text-[#005459] hover:underline font-mono cursor-pointer"
+              >
+                {showAllPresets ? 'Show recommended only' : `Show all ${isWindows ? 'Windows' : 'Linux'} recipes`}
+              </button>
+            </div>
+
+            {/* Smart Stack Banner */}
+            <div className="p-2.5 bg-[#FAFBFB] border border-[#E2E7E4] rounded-[6px] mb-2 text-[11px] text-[#565f6b] flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-[#101d26]">Project Stack:</span>
+                <span className="px-2 py-0.5 rounded font-mono font-bold bg-[#E2F0FD] text-[#005459] border border-[#BEDDF7]">
+                  {FRAMEWORK_LABELS[projectFramework] || projectFramework}
+                </span>
+                <span className="text-[#8F9CA7]">•</span>
+                <span className="font-semibold text-[#101d26]">Server OS:</span>
+                <span className={`px-2 py-0.5 rounded font-mono font-semibold ${isWindows ? 'bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]' : 'bg-[#EAF5EE] text-[#2E8B57] border-[#B8E0C5]'}`}>
+                  {isWindows ? 'Windows Server' : 'Linux / Unix VPS'}
+                </span>
+              </div>
+              <span className="text-[10px] text-[#2E8B57] font-medium hidden sm:inline">
+                ✓ Compatible with target server
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-2">
-              {TARGET_PRESETS.map((preset) => {
+
+            {/* Filtered Compatible Presets Grid */}
+            <div className={`grid ${displayedPresets.length > 1 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mb-2`}>
+              {displayedPresets.map((preset) => {
                 const isSelected = selectedPresetId === preset.id
+                const isRecommended = preset.architecture === 'atomic-symlink' || preset.id === 'react-spa' || preset.id === 'custom' || preset.id.startsWith('windows')
                 return (
                   <button
                     key={preset.id}
@@ -304,26 +364,23 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, onTargetUp
                       <span className={isSelected ? 'text-[#005459]' : 'text-[#101d26]'}>
                         {preset.label}
                       </span>
-                      {preset.architecture === 'atomic-symlink' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#005459] border border-[#B8E0C5]">
-                          Zero-Downtime
-                        </span>
-                      )}
-                      {preset.architecture === 'cpanel-sftp' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
-                          Zero-Shell
-                        </span>
-                      )}
-                      {preset.architecture === 'docker' && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
-                          Daemon
-                        </span>
-                      )}
-                      {preset.architecture.startsWith('windows') && (
-                        <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EFF6FF] text-[#1D4ED8] border border-[#BFDBFE]">
-                          Windows
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {isRecommended && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-[#EAF5EE] text-[#2E8B57] border border-[#B8E0C5]">
+                            Recommended
+                          </span>
+                        )}
+                        {preset.architecture === 'atomic-symlink' && (
+                          <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#E2F0FD] text-[#005459] border border-[#BEDDF7]">
+                            Zero-Downtime
+                          </span>
+                        )}
+                        {preset.architecture === 'cpanel-sftp' && (
+                          <span className="px-1 py-0.2 rounded text-[9px] font-mono font-bold bg-[#FFF4E5] text-[#C2410C] border border-[#FED7AA]">
+                            Zero-Shell
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <div className="text-[10px] text-[#565f6b] leading-tight mt-0.5">
                       {preset.desc}

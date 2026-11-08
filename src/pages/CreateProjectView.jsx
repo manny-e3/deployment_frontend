@@ -25,28 +25,31 @@ import { OneTimeSecretModal } from '../components/OneTimeSecretModal'
 
 export const FRAMEWORKS = [
   {
-    id: 'react',
-    name: 'React.js / Vite SPA',
-    badge: 'Single Page App',
-    badgeColor: 'bg-[#E2F0FD] text-[#005459] border-[#BEDDF7]',
-    description: 'React SPA (Vite / CRA) with client-side routing, dependency installation, and static asset deployment.',
-    icon: Atom,
+    id: 'node',
+    name: 'Node.js / PM2 (Next.js / Express / NestJS)',
+    badge: 'PM2 / Node 20+',
+    badgeColor: 'bg-[#EAF5EE] text-[#2E8B57] border-[#B8E0C5]',
+    description: 'Auto-generates npm ci, build, and zero-downtime PM2 reload for API or SSR microservices.',
+    recipe: 'npm ci && npm run build && (pm2 restart ecosystem.config.js || pm2 reload app || pm2 start dist/main.js --name app)',
+    icon: Terminal,
   },
   {
     id: 'laravel',
-    name: 'Laravel / PHP',
-    badge: 'Fullstack / API',
+    name: 'PHP / Laravel',
+    badge: 'Artisan / PHP-FPM',
     badgeColor: 'bg-[#FAF0E6] text-[#A0522D] border-[#F5DEB3]',
-    description: 'Laravel framework with Composer dependencies, database migrations, and artisan cache optimization.',
+    description: 'Automates Composer dependencies, database migrations, artisan route/config cache, and PHP-FPM reload.',
+    recipe: 'composer install --no-dev --prefer-dist --optimize-autoloader && php artisan migrate --force && php artisan config:cache && php artisan route:cache && (systemctl reload php8.2-fpm || systemctl reload php-fpm || true)',
     icon: Layers,
   },
   {
-    id: 'node',
-    name: 'Node.js / Express',
-    badge: 'Backend Service',
-    badgeColor: 'bg-[#EAF5EE] text-[#2E8B57] border-[#B8E0C5]',
-    description: 'Node.js API or microservice managed with PM2 process manager for continuous background execution.',
-    icon: Terminal,
+    id: 'react',
+    name: 'Static / SPA (React / Vue / Vite)',
+    badge: 'Vite / Nginx',
+    badgeColor: 'bg-[#E2F0FD] text-[#005459] border-[#BEDDF7]',
+    description: 'Builds optimized client production bundle and atomically rsyncs assets to the server web root.',
+    recipe: 'npm ci && npm run build && rsync -av --delete dist/ /var/www/html/',
+    icon: Atom,
   },
   {
     id: 'custom',
@@ -54,6 +57,7 @@ export const FRAMEWORKS = [
     badge: 'Universal',
     badgeColor: 'bg-[#F4F6F5] text-[#565f6b] border-[#CDD4D0]',
     description: 'Generic HTML/CSS or custom script deployment with full lifecycle hook freedom.',
+    recipe: '# Add custom deployment commands here\necho "Deploying application..."',
     icon: FileCode2,
   },
 ]
@@ -78,6 +82,8 @@ export function CreateProjectView() {
   const [deployPublicKey, setDeployPublicKey] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState(null)
+  const [nameError, setNameError] = useState(null)
+  const [repoError, setRepoError] = useState(null)
 
   // Fetch deploy key from backend
   useEffect(() => {
@@ -123,12 +129,22 @@ export function CreateProjectView() {
   }
 
   const handleCreateProject = async () => {
+    setNameError(null)
+    setRepoError(null)
+    setSubmitError(null)
+
+    let hasError = false
     if (!projectName.trim()) {
-      setSubmitError('Project name is required.')
-      return
+      setNameError('Project name is required.')
+      hasError = true
     }
     if (!repoUrl.trim()) {
-      setSubmitError('Repository URL is required.')
+      setRepoError('Repository URL is required.')
+      hasError = true
+    }
+
+    if (hasError) {
+      setSubmitError('Please fill in the required fields highlighted in red below.')
       return
     }
 
@@ -136,14 +152,14 @@ export function CreateProjectView() {
     const strippedProtocol = cleanRepoUrl.replace(/^https?:\/\//i, '')
     if (strippedProtocol.startsWith('github_pat_') || strippedProtocol.startsWith('ghp_') || strippedProtocol.startsWith('glpat-')) {
       if (!cleanRepoUrl.includes('@github.com') && !cleanRepoUrl.includes('@gitlab.com') && !cleanRepoUrl.includes('@bitbucket.org')) {
-        setSubmitError('You entered an access token without a repository URL. Format: https://<token>@github.com/<owner>/<repo>.git')
+        const tokenErr = 'You entered an access token without a repository URL. Format: https://<token>@github.com/<owner>/<repo>.git'
+        setRepoError(tokenErr)
+        setSubmitError(tokenErr)
         return
       }
     }
     if (!cleanRepoUrl.startsWith('http://') && !cleanRepoUrl.startsWith('https://') && !cleanRepoUrl.startsWith('git@') && !cleanRepoUrl.startsWith('ssh://')) {
-      if (cleanRepoUrl.includes('github.com') || cleanRepoUrl.includes('gitlab.com') || cleanRepoUrl.includes('bitbucket.org') || cleanRepoUrl.includes('@')) {
-        cleanRepoUrl = `https://${cleanRepoUrl}`
-      }
+      cleanRepoUrl = `https://${cleanRepoUrl}`
     }
 
     setIsSubmitting(true)
@@ -177,7 +193,18 @@ export function CreateProjectView() {
         navigate(`/projects/${res?.id || ''}`, { state: { framework: selectedFramework } })
       }
     } catch (err) {
-      if (err.details?.fields && Array.isArray(err.details.fields)) {
+      console.error('Project creation failed:', err)
+      const isDuplicateName =
+        err?.code === 'ALREADY_EXISTS' ||
+        err?.message?.includes('already exists') ||
+        err?.details?.fields === 'Project_name_key' ||
+        (typeof err?.details?.fields === 'string' && err.details.fields.includes('name'))
+
+      if (isDuplicateName) {
+        const dupMsg = `A project named "${projectName.trim()}" already exists. Please choose a different name.`
+        setNameError(dupMsg)
+        setSubmitError(dupMsg)
+      } else if (err.details?.fields && Array.isArray(err.details.fields)) {
         const detailsMsg = err.details.fields
           .map((f) => `${f.field.replace(/^(body|query|params)\./, '')}: ${f.message}`)
           .join(', ')
@@ -229,7 +256,7 @@ export function CreateProjectView() {
             <button
               type="button"
               onClick={handleCreateProject}
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting}
               className="h-[34px] px-4 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] active:bg-[#083F43] text-white text-[12px] font-medium flex items-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (
@@ -278,6 +305,14 @@ export function CreateProjectView() {
             </div>
 
             <div className="p-6 space-y-6">
+              {/* Top Submit Error Banner */}
+              {submitError && (
+                <div className="p-3.5 rounded-[6px] bg-[#FAEBE9] border border-[#F1B5AC] text-[#C2412D] text-[13px] flex items-center gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 shrink-0 text-[#C2412D]" />
+                  <span className="font-medium">{submitError}</span>
+                </div>
+              )}
+
               {/* Framework Selector */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -325,6 +360,29 @@ export function CreateProjectView() {
                     )
                   })}
                 </div>
+
+                {/* 1-Click Stack Recipe Preview */}
+                {selectedFw?.recipe && (
+                  <div className="mt-3.5 p-3.5 rounded-[8px] border border-[#B8E0C5] bg-[#EAF5EE]/60 space-y-2 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-[#2E8B57]" />
+                        <span className="text-[12px] font-bold text-[#101d26]">
+                          1-Click Stack Recipe: {selectedFw.name}
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono text-[#2E8B57] font-semibold bg-white px-2 py-0.5 rounded border border-[#B8E0C5]">
+                        AUTO-GENERATED RECIPE
+                      </span>
+                    </div>
+                    <div className="p-2.5 rounded-[6px] bg-[#061014] text-[#00DF8F] font-mono text-[11px] overflow-x-auto whitespace-pre-wrap break-all border border-white/5">
+                      {selectedFw.recipe}
+                    </div>
+                    <p className="text-[11px] text-[#565f6b]">
+                      This recipe will be automatically applied when you create deployment targets for this project.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Project Name & Default Branch */}
@@ -343,11 +401,25 @@ export function CreateProjectView() {
                   <input
                     type="text"
                     value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
+                    onChange={(e) => {
+                      setProjectName(e.target.value)
+                      setNameError(null)
+                      setSubmitError(null)
+                    }}
                     placeholder="e.g. travaiq-react-frontend"
-                    className="w-full h-[36px] px-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] text-[#101d26] outline-none focus:border-[#005459] focus:ring-1 focus:ring-[#005459]"
+                    className={`w-full h-[36px] px-3 bg-[#FFFFFF] border rounded-[6px] text-[13px] text-[#101d26] outline-none transition-colors ${
+                      nameError
+                        ? 'border-[#C2412D] focus:border-[#C2412D] focus:ring-1 focus:ring-[#C2412D]'
+                        : 'border-[#CDD4D0] focus:border-[#005459] focus:ring-1 focus:ring-[#005459]'
+                    }`}
                     required
                   />
+                  {nameError && (
+                    <p className="text-[11px] text-[#C2412D] mt-1 flex items-center gap-1 font-medium">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{nameError}</span>
+                    </p>
+                  )}
                 </div>
                 <div className="md:col-span-4">
                   <div className="flex items-center justify-between mb-1.5">
@@ -376,9 +448,17 @@ export function CreateProjectView() {
                   <label className="text-[12px] font-medium text-[#101d26]">
                     Git Repository URL <span className="text-[#C2412D]">*</span>
                   </label>
-                  <span className="text-[11px] text-[#565f6b]">
-                    Supports GitHub, GitLab, Bitbucket, Gitea
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRepoUrl('https://github.com/manny-e3/valeristech.git')
+                      setRepoError(null)
+                      setSubmitError(null)
+                    }}
+                    className="text-[11px] text-[#005459] hover:underline font-mono cursor-pointer"
+                  >
+                    Use sample repository
+                  </button>
                 </div>
                 <div className="flex items-center gap-2">
                   <div className="relative flex-1">
@@ -388,10 +468,16 @@ export function CreateProjectView() {
                       value={repoUrl}
                       onChange={(e) => {
                         setRepoUrl(e.target.value)
+                        setRepoError(null)
+                        setSubmitError(null)
                         setIsRepoVerified(false)
                       }}
                       placeholder="git@github.com:organization/project.git or https://github.com/..."
-                      className="w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border border-[#CDD4D0] rounded-[6px] text-[13px] font-mono text-[#101d26] outline-none focus:border-[#005459] focus:ring-1 focus:ring-[#005459]"
+                      className={`w-full h-[36px] pl-8 pr-3 bg-[#FFFFFF] border rounded-[6px] text-[13px] font-mono text-[#101d26] outline-none transition-colors ${
+                        repoError
+                          ? 'border-[#C2412D] focus:border-[#C2412D] focus:ring-1 focus:ring-[#C2412D]'
+                          : 'border-[#CDD4D0] focus:border-[#005459] focus:ring-1 focus:ring-[#005459]'
+                      }`}
                     />
                   </div>
                   <button
@@ -400,19 +486,16 @@ export function CreateProjectView() {
                     disabled={!repoUrl}
                     className="h-[36px] px-3 rounded-[6px] bg-[#FFFFFF] border border-[#CDD4D0] hover:bg-[#F4F6F5] text-[#101d26] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    {copiedRepo ? <Check className="w-3.5 h-3.5 text-[#2E8B57]" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedRepo ? <Check className="w-3.5 h-3.5 text-[#2E8B57]" /> : <Copy className="w-3.5 h-3.5 text-[#565f6b]" />}
                     <span>Copy</span>
                   </button>
-                  {/* <button
-                    type="button"
-                    onClick={handleTestRepo}
-                    disabled={isTestingRepo || !repoUrl}
-                    className="h-[36px] px-3.5 rounded-[6px] bg-[#FFFFFF] border border-[#CDD4D0] hover:bg-[#F4F6F5] text-[#101d26] text-[12px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
-                  >
-                    <RotateCcw className={`w-3.5 h-3.5 ${isTestingRepo ? 'animate-spin' : ''}`} />
-                    <span>{isTestingRepo ? 'Verifying...' : 'Test access'}</span>
-                  </button> */}
                 </div>
+                {repoError && (
+                  <p className="text-[11px] text-[#C2412D] mt-1 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                    <span>{repoError}</span>
+                  </p>
+                )}
               </div>
 
               {/* Project Public URL / Domain */}
@@ -525,7 +608,7 @@ export function CreateProjectView() {
               <button
                 type="button"
                 onClick={handleCreateProject}
-                disabled={isSubmitting || !isFormValid}
+                disabled={isSubmitting}
                 className="h-[36px] px-5 rounded-[6px] bg-[#005459] hover:bg-[#0B5459] active:bg-[#083F43] text-white text-[12px] font-medium flex items-center gap-2 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
@@ -596,7 +679,7 @@ export function CreateProjectView() {
                   ) : (
                     <div className="w-3.5 h-3.5 rounded-full border border-[#CDD4D0]" />
                   )}
-                  <span className={projectName.trim() ? 'text-[#101d26]' : 'text-[#8F9CA7]'}>
+                  <span className={projectName.trim() ? 'text-[#101d26] font-medium' : 'text-[#8F9CA7]'}>
                     Project name specified
                   </span>
                 </li>
@@ -606,18 +689,14 @@ export function CreateProjectView() {
                   ) : (
                     <div className="w-3.5 h-3.5 rounded-full border border-[#CDD4D0]" />
                   )}
-                  <span className={repoUrl.trim() ? 'text-[#101d26]' : 'text-[#8F9CA7]'}>
+                  <span className={repoUrl.trim() ? 'text-[#101d26] font-medium' : 'text-[#8F9CA7]'}>
                     Git repository URL provided
                   </span>
                 </li>
                 <li className="flex items-center gap-2">
-                  {isRepoVerified ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#2E8B57]" />
-                  ) : (
-                    <div className="w-3.5 h-3.5 rounded-full border border-[#CDD4D0]" />
-                  )}
-                  <span className={isRepoVerified ? 'text-[#101d26]' : 'text-[#8F9CA7]'}>
-                    Repository access verified
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#2E8B57]" />
+                  <span className="text-[#101d26] font-medium">
+                    Stack blueprint: {selectedFw.name}
                   </span>
                 </li>
               </ul>
@@ -627,7 +706,7 @@ export function CreateProjectView() {
             <button
               type="button"
               onClick={handleCreateProject}
-              disabled={isSubmitting || !isFormValid}
+              disabled={isSubmitting}
               className="w-full h-[38px] rounded-[6px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer disabled:opacity-50"
             >
               {isSubmitting ? (

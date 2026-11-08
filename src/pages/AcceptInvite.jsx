@@ -38,8 +38,8 @@ export function AcceptInvite() {
     e.preventDefault()
     setErrorMessage(null)
 
-    if (password.length < 6) {
-      setErrorMessage('Password must be at least 6 characters.')
+    if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+      setErrorMessage('Password must be at least 8 characters and contain both letters and numbers.')
       return
     }
 

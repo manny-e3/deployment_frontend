@@ -20,17 +20,23 @@ import {
   Building2,
   Copy,
   Check,
-  Sparkles
+  Sparkles,
+  UserX,
+  UserCheck,
+  Trash2,
+  Ban
 } from 'lucide-react'
 import { ROLE_DEFINITIONS } from '../data/usersData'
 import { InviteUserModal } from '../components/InviteUserModal'
 import { OneTimeSecretModal } from '../components/OneTimeSecretModal'
 import { useAuth } from '../context/AuthContext'
+import { useToast } from '../context/ToastContext'
 import { can } from '../utils/permissions'
 import { api, ApiError } from '../services/api'
 
 export function UsersView() {
   const { user: currentUser, role, isSuperAdmin, organizationName } = useAuth()
+  const { showToast } = useToast()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('All')
@@ -39,9 +45,18 @@ export function UsersView() {
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [tempPasswordModal, setTempPasswordModal] = useState({ isOpen: false, password: '', userEmail: '', inviteLink: '' })
+  const [tempPasswordModal, setTempPasswordModal] = useState({
+    isOpen: false,
+    title: '',
+    subtitle: '',
+    secretLabel: '',
+    secretValue: '',
+    userEmail: '',
+  })
   const [copiedGeneralInvite, setCopiedGeneralInvite] = useState(false)
   const [copiedMemberId, setCopiedMemberId] = useState(null)
+  const [resendingEmail, setResendingEmail] = useState(null)
+  const [actionLoadingId, setActionLoadingId] = useState(null)
 
   useEffect(() => {
     let isMounted = true
@@ -50,38 +65,36 @@ export function UsersView() {
       try {
         const res = await api('/users', { query: { limit: 50 } })
         let items = []
+        const origin = window.location.origin
+        const org = organizationName || 'Primary Workspace'
         if (res && res.items && isMounted) {
-          items = res.items.map((u) => ({
-            ...u,
-            roleTitle: u.role === 'ADMIN' ? 'Admin Engineer' : u.role === 'DEPLOYER' ? 'Platform Deployer' : 'Telemetry Observer',
-            isYou: u.email?.toLowerCase() === currentUser?.email?.toLowerCase(),
-            status: u.isActive ? 'Active' : 'Deactivated',
-            lastActive: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleTimeString() : 'Never',
-          }))
+          items = res.items.map((u) => {
+            const isInvited = Boolean(u.inviteToken)
+            const inviteLink = isInvited
+              ? `${origin}/accept-invite?token=${encodeURIComponent(u.inviteToken)}&email=${encodeURIComponent(u.email)}&role=${encodeURIComponent(u.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
+              : null
+            return {
+              ...u,
+              roleTitle: u.roleTitle || (u.role === 'ADMIN' ? 'Admin Engineer' : u.role === 'DEPLOYER' ? 'Platform Deployer' : 'Telemetry Observer'),
+              isYou: u.email?.toLowerCase() === currentUser?.email?.toLowerCase(),
+              status: isInvited ? 'Invited' : (u.isActive ? 'Active' : 'Deactivated'),
+              lastActive: u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleTimeString() : (u.invitedAt ? 'Invited' : 'Never'),
+              canResend: isInvited,
+              inviteLink,
+            }
+          })
         }
 
-        // Also merge local onboarded members
-        const localOnboarded = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
         const existingEmails = new Set(items.map((i) => i.email?.toLowerCase()))
-
-        for (const loc of localOnboarded) {
-          if (!existingEmails.has(loc.email?.toLowerCase())) {
-            items.push({
-              ...loc,
-              isYou: loc.email?.toLowerCase() === currentUser?.email?.toLowerCase(),
-            })
-            existingEmails.add(loc.email?.toLowerCase())
-          }
-        }
 
         // Ensure current user is included and marked properly
         if (currentUser && !existingEmails.has(currentUser.email?.toLowerCase())) {
           items.unshift({
             id: currentUser.id || 'usr_current',
-            name: currentUser.name || 'Alex Mercer',
-            email: currentUser.email || 'alex@company.internal',
-            role: currentUser.role || (isSuperAdmin ? 'SUPER_ADMIN' : 'DEPLOYER'),
-            roleTitle: currentUser.roleTitle || (isSuperAdmin ? 'Super Admin & Owner' : 'Platform Deployer'),
+            name: currentUser.name || 'Workspace User',
+            email: currentUser.email || '',
+            role: currentUser.role || 'ADMIN',
+            roleTitle: currentUser.roleTitle || 'Workspace Owner',
             isSuperAdmin: isSuperAdmin,
             isYou: true,
             status: 'Active',
@@ -93,16 +106,14 @@ export function UsersView() {
         if (isMounted) setUsers(items)
       } catch (err) {
         console.error('Failed to fetch users:', err)
-        // Fallback to local stored members
-        const localOnboarded = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
         const items = []
         if (currentUser) {
           items.push({
             id: currentUser.id || 'usr_current',
-            name: currentUser.name || 'Alex Mercer',
-            email: currentUser.email || 'alex@company.internal',
-            role: currentUser.role || (isSuperAdmin ? 'SUPER_ADMIN' : 'DEPLOYER'),
-            roleTitle: currentUser.roleTitle || (isSuperAdmin ? 'Super Admin & Owner' : 'Platform Deployer'),
+            name: currentUser.name || 'Workspace User',
+            email: currentUser.email || '',
+            role: currentUser.role || 'ADMIN',
+            roleTitle: currentUser.roleTitle || 'Workspace Owner',
             isSuperAdmin: isSuperAdmin,
             isYou: true,
             status: 'Active',
@@ -110,7 +121,6 @@ export function UsersView() {
             avatar: currentUser.avatar || '/avatar.jpg',
           })
         }
-        items.push(...localOnboarded)
         if (isMounted) setUsers(items)
       } finally {
         if (isMounted) setLoading(false)
@@ -120,37 +130,56 @@ export function UsersView() {
     return () => {
       isMounted = false
     }
-  }, [currentUser, isSuperAdmin])
+  }, [currentUser, isSuperAdmin, organizationName])
 
   const handleAddUser = async (newUser) => {
+    const res = await api('/users/invite', {
+      method: 'POST',
+      body: {
+        email: newUser.email,
+        name: newUser.name,
+        role: newUser.role?.toUpperCase() || 'DEPLOYER',
+        roleTitle: newUser.roleTitle,
+      },
+    })
+
     const origin = window.location.origin
-    const token = `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
-    const org = organizationName || 'Engineering'
-    const inviteLink = `${origin}/accept-invite?token=${token}&email=${encodeURIComponent(newUser.email)}&role=${encodeURIComponent(newUser.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Super Admin')}`
+    const org = organizationName || 'Primary Workspace'
+    const token = res?.user?.inviteToken || ''
+    const inviteLink = res?.inviteLink || `${origin}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(newUser.email)}&role=${encodeURIComponent(newUser.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
 
     const enrichedUser = {
       ...newUser,
+      id: res?.user?.id || `u-${Date.now()}`,
+      name: res?.user?.name || newUser.name || newUser.email.split('@')[0],
+      email: res?.user?.email || newUser.email,
+      role: res?.user?.role || newUser.role?.toUpperCase(),
+      roleTitle: res?.user?.roleTitle || newUser.roleTitle || 'Platform Engineer',
+      initials: (res?.user?.name || newUser.name || newUser.email).slice(0, 2).toUpperCase(),
+      bg: (res?.user?.role || newUser.role) === 'ADMIN' ? 'bg-[#005459]' : 'bg-[#565f6b]',
+      status: 'Invited',
       inviteToken: token,
       inviteLink,
-      invitedBy: currentUser?.name || 'Super Admin',
-      status: 'Invited',
+      invitedBy: currentUser?.name || 'Workspace Admin',
+      invitedAt: res?.user?.invitedAt || new Date().toISOString(),
       lastActive: 'Just now',
       canResend: true,
     }
 
-    // Persist to local onboarded list
-    const existing = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
-    localStorage.setItem('deploy_portal_onboarded_members', JSON.stringify([enrichedUser, ...existing]))
+    setUsers((prev) => [enrichedUser, ...prev.filter((u) => u.email?.toLowerCase() !== newUser.email.toLowerCase())])
 
-    setUsers((prev) => [enrichedUser, ...prev])
-
-    const mockTempPassword = `tmp_${Math.random().toString(36).substring(2, 10)}${Math.random().toString(36).substring(2, 6).toUpperCase()}!`
     setTempPasswordModal({
       isOpen: true,
-      password: mockTempPassword,
+      title: res?.emailSent ? 'Invitation Email Dispatched!' : 'Member Invitation Created',
+      subtitle: res?.emailSent
+        ? `An invitation email has been sent to ${newUser.email}. The new member can click the link in their inbox to join ${org}. You can also share the direct link below as a backup.`
+        : `An invitation has been generated for ${newUser.email}. Share this link with them to join ${org}:`,
+      secretLabel: 'Invitation Link',
+      secretValue: inviteLink,
       userEmail: newUser.email,
-      inviteLink,
     })
+
+    return res
   }
 
   const handleCopyGeneralInvite = () => {
@@ -168,8 +197,85 @@ export function UsersView() {
     setTimeout(() => setCopiedMemberId(null), 2000)
   }
 
-  const handleResendInvite = (email) => {
-    alert(`Invitation resent to ${email}`)
+  const handleResendInvite = async (email) => {
+    setResendingEmail(email)
+    try {
+      const res = await api('/users/resend-invite', {
+        method: 'POST',
+        body: { email },
+      })
+      showToast({
+        type: 'success',
+        title: 'Invitation Sent',
+        message: res?.emailSent ? `Invitation email resent to ${email} successfully!` : `Invitation renewed for ${email}.`,
+      })
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: 'Resend Failed',
+        message: err.message || `Failed to resend invitation to ${email}`,
+      })
+    } finally {
+      setResendingEmail(null)
+    }
+  }
+
+  const handleToggleStatus = async (targetUser) => {
+    if (targetUser.isYou) return
+    const nextActive = targetUser.status !== 'Active'
+    setActionLoadingId(targetUser.id)
+    try {
+      await api(`/users/${targetUser.id}`, {
+        method: 'PATCH',
+        body: { isActive: nextActive },
+      })
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === targetUser.id
+            ? { ...u, isActive: nextActive, status: nextActive ? 'Active' : 'Deactivated' }
+            : u
+        )
+      )
+      showToast({
+        type: nextActive ? 'success' : 'warning',
+        title: nextActive ? 'Account Reactivated' : 'Account Suspended',
+        message: nextActive
+          ? `${targetUser.name || targetUser.email}'s platform access has been restored.`
+          : `${targetUser.name || targetUser.email} has been suspended. All active sessions have been terminated.`,
+      })
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: 'Action Failed',
+        message: err.message || 'Could not update user account status.',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
+  }
+
+  const handleRevokeInvite = async (targetUser) => {
+    if (!window.confirm(`Revoke invitation for ${targetUser.email}? The invitation link will immediately stop working.`)) {
+      return
+    }
+    setActionLoadingId(targetUser.id)
+    try {
+      await api(`/users/${targetUser.id}`, { method: 'DELETE' })
+      setUsers((prev) => prev.filter((u) => u.id !== targetUser.id))
+      showToast({
+        type: 'success',
+        title: 'Invitation Revoked',
+        message: `The invitation for ${targetUser.email} has been permanently cancelled.`,
+      })
+    } catch (err) {
+      showToast({
+        type: 'error',
+        title: 'Revocation Failed',
+        message: err.message || 'Could not revoke invitation.',
+      })
+    } finally {
+      setActionLoadingId(null)
+    }
   }
 
   const filteredUsers = users.filter((u) => {
@@ -480,7 +586,7 @@ export function UsersView() {
 
                       {/* Actions / Last Active */}
                       <td className="py-3 px-5 text-right font-mono text-[11px] text-[#565f6b]">
-                        <div className="flex items-center justify-end gap-2">
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
                           {u.status === 'Invited' && u.inviteLink && (
                             <button
                               type="button"
@@ -489,20 +595,62 @@ export function UsersView() {
                               title="Copy personalized invite link"
                             >
                               {copiedMemberId === u.id ? <Check className="w-3 h-3 text-[#2E8B57]" /> : <Copy className="w-3 h-3" />}
-                              <span>{copiedMemberId === u.id ? 'Copied' : 'Invite Link'}</span>
+                              <span>{copiedMemberId === u.id ? 'Copied' : 'Link'}</span>
                             </button>
                           )}
 
-                          <div>{u.lastActive}</div>
                           {u.canResend && (
                             <button
                               type="button"
+                              disabled={resendingEmail === u.email}
                               onClick={() => handleResendInvite(u.email)}
-                              className="text-[10px] text-[#005459] hover:underline font-semibold cursor-pointer ml-1"
+                              className="h-[24px] px-2 rounded-[4px] bg-[#FFFFFF] hover:bg-[#F4F6F5] border border-[#CDD4D0] text-[10px] text-[#101d26] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Resend invitation email"
                             >
-                              Resend
+                              <span>{resendingEmail === u.email ? 'Sending...' : 'Resend'}</span>
                             </button>
                           )}
+
+                          {u.status === 'Invited' && (
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === u.id}
+                              onClick={() => handleRevokeInvite(u)}
+                              className="h-[24px] px-2 rounded-[4px] bg-[#FAEBE9] hover:bg-red-100 border border-[#F1B5AC] text-[10px] text-[#BA1A1A] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Revoke and cancel invitation"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Revoke</span>
+                            </button>
+                          )}
+
+                          {!u.isYou && u.status === 'Active' && (
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === u.id}
+                              onClick={() => handleToggleStatus(u)}
+                              className="h-[24px] px-2 rounded-[4px] bg-[#FAF3E7] hover:bg-amber-100 border border-[#F1D6A4] text-[10px] text-[#B87E0C] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Suspend user and end active sessions"
+                            >
+                              <Ban className="w-3 h-3" />
+                              <span>Suspend</span>
+                            </button>
+                          )}
+
+                          {!u.isYou && u.status === 'Deactivated' && (
+                            <button
+                              type="button"
+                              disabled={actionLoadingId === u.id}
+                              onClick={() => handleToggleStatus(u)}
+                              className="h-[24px] px-2 rounded-[4px] bg-[#EBF5EE] hover:bg-emerald-100 border border-emerald-200 text-[10px] text-[#2E8B57] font-medium flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                              title="Restore user platform access"
+                            >
+                              <UserCheck className="w-3 h-3" />
+                              <span>Reactivate</span>
+                            </button>
+                          )}
+
+                          <div className="text-[10px] text-zinc-400 pl-1">{u.lastActive}</div>
                         </div>
                       </td>
                     </tr>
@@ -736,14 +884,26 @@ export function UsersView() {
         onInviteUser={handleAddUser}
       />
 
-      {/* One-Time Temporary Password Modal */}
+      {/* One-Time Temporary Password / Invitation Modal */}
       <OneTimeSecretModal
         isOpen={tempPasswordModal.isOpen}
-        onClose={() => setTempPasswordModal({ isOpen: false, password: '', userEmail: '' })}
-        title="User Invitation Created"
-        subtitle={`A temporary credential has been generated for ${tempPasswordModal.userEmail}. Share this with the user securely; they will be required to change it upon first login.`}
-        secretLabel="One-Time Temporary Password"
-        secretValue={tempPasswordModal.password}
+        onClose={() =>
+          setTempPasswordModal({
+            isOpen: false,
+            title: '',
+            subtitle: '',
+            secretLabel: '',
+            secretValue: '',
+            userEmail: '',
+          })
+        }
+        title={tempPasswordModal.title || 'User Invitation Created'}
+        subtitle={
+          tempPasswordModal.subtitle ||
+          `An invitation has been generated for ${tempPasswordModal.userEmail}. Share this with the user securely.`
+        }
+        secretLabel={tempPasswordModal.secretLabel || 'Invitation Link'}
+        secretValue={tempPasswordModal.secretValue || ''}
       />
     </div>
   )

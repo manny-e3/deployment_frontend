@@ -9,21 +9,27 @@ import {
   ProjectDetailView,
   CreateProjectView,
   ServersView,
+  CreateServerView,
   DeploymentsView,
   UsersView,
+  TeamDetailView,
   AuditLogView,
   SettingsView,
+  ProfileView,
   SignIn,
   Register,
+  ConfirmEmail,
+  ConfirmEmailPending,
   ForgotPassword,
   ResetPassword,
   OnboardingView,
   AcceptInvite,
   LandingPage,
+  PlatformAdminView,
 } from './pages'
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, user, loading } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -37,6 +43,12 @@ function ProtectedRoute({ children }) {
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
+
+  // Gate users whose email is unconfirmed: they cannot see onboarding or workspace
+  if (user && user.isEmailVerified === false) {
+    return <Navigate to="/confirm-email-pending" state={{ from: location }} replace />
+  }
+
   return children
 }
 
@@ -50,6 +62,8 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/confirm-email" element={<ConfirmEmail />} />
+            <Route path="/confirm-email-pending" element={<ConfirmEmailPending />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/accept-invite" element={<AcceptInvite />} />
@@ -73,14 +87,20 @@ export default function App() {
               }
             >
               <Route path="/dashboard" element={<DashboardView />} />
+              <Route path="/platform-admin" element={<PlatformAdminView />} />
               <Route path="/projects" element={<ProjectsView />} />
               <Route path="/projects/new" element={<CreateProjectView />} />
               <Route path="/projects/:projectId" element={<ProjectDetailView />} />
               <Route path="/servers" element={<ServersView />} />
+              <Route path="/servers/create" element={<CreateServerView />} />
+              <Route path="/servers/new" element={<CreateServerView />} />
               <Route path="/deployments" element={<DeploymentsView />} />
               <Route path="/users" element={<UsersView />} />
+              <Route path="/teams" element={<TeamDetailView />} />
+              <Route path="/teams/:tab" element={<TeamDetailView />} />
               <Route path="/audit-log" element={<AuditLogView />} />
               <Route path="/settings" element={<SettingsView />} />
+              <Route path="/profile" element={<ProfileView />} />
               {/* Catch-all fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>

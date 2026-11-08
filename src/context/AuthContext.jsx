@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import { api, setOnSessionEnded, ApiError, getAuthToken, clearAuthTokens, getRefreshToken } from '../services/api'
+import { api, setOnSessionEnded, ApiError, getAuthToken, setAuthTokens, clearAuthTokens, getRefreshToken, setCsrfToken } from '../services/api'
 import { connectSocket, disconnectSocket, setSocketSessionEndedHandler } from '../services/socket'
 
 const AuthContext = createContext(null)
@@ -26,6 +26,11 @@ export function AuthProvider({ children }) {
     setUser(null)
     localStorage.setItem('deploy_portal_logged_out', 'true')
     localStorage.removeItem('deploy_portal_user')
+    localStorage.removeItem('deploy_portal_organization')
+    localStorage.removeItem('deploy_portal_onboarded_members')
+    localStorage.removeItem('deploy_portal_onboarding_completed')
+    localStorage.removeItem('deploy_portal_registered_users')
+    localStorage.removeItem('deploy_portal_super_admin_id')
     disconnectSocket()
   }
 
@@ -44,6 +49,10 @@ export function AuthProvider({ children }) {
             ...me,
             avatar: me.avatar || '/avatar.jpg',
             roleTitle: me.roleTitle || (me.role === 'ADMIN' ? 'Staff Platform Eng' : me.role),
+            isEmailVerified: me.isEmailVerified ?? true,
+            notifyDeployFailures: me.notifyDeployFailures ?? true,
+            notifyDeploySuccess: me.notifyDeploySuccess ?? true,
+            notifyTeamChanges: me.notifyTeamChanges ?? true,
           }
           setUser(formatted)
           localStorage.removeItem('deploy_portal_logged_out')
@@ -84,6 +93,7 @@ export function AuthProvider({ children }) {
             ...loggedInUser,
             avatar: loggedInUser.avatar || '/avatar.jpg',
             roleTitle: loggedInUser.roleTitle || (loggedInUser.role === 'ADMIN' ? 'Staff Platform Eng' : loggedInUser.role),
+            isEmailVerified: loggedInUser.isEmailVerified ?? true,
           }
           setUser(formatted)
           localStorage.removeItem('deploy_portal_logged_out')
@@ -122,7 +132,7 @@ export function AuthProvider({ children }) {
     }
 
     const isFirstUser = existingUsers.length === 0 || !localStorage.getItem('deploy_portal_super_admin_id')
-    const assignedRole = isFirstUser ? 'SUPER_ADMIN' : 'DEPLOYER'
+    const assignedRole = 'ADMIN'
     const assignedTitle = isFirstUser ? 'Super Admin & Owner' : 'Platform Deployer'
 
     try {
@@ -143,9 +153,11 @@ export function AuthProvider({ children }) {
           ...res,
           avatar: res.avatar || '/avatar.jpg',
           role: res.role || assignedRole,
-          roleTitle: res.roleTitle || assignedTitle,
-          isSuperAdmin: res.role === 'SUPER_ADMIN' || isFirstUser,
+          roleTitle: res.roleTitle || (res.role === 'ADMIN' ? 'Super Admin & Owner' : assignedTitle),
+          isSuperAdmin: res.role === 'ADMIN' || isFirstUser,
           organizationName: res.organizationName || orgName,
+          isEmailVerified: res.isEmailVerified ?? false,
+          emailSent: res.emailSent ?? true,
         }
         setUser(formatted)
         localStorage.removeItem('deploy_portal_logged_out')
@@ -158,6 +170,9 @@ export function AuthProvider({ children }) {
         return formatted
       }
     } catch (err) {
+      if (err instanceof ApiError) {
+        throw new Error(err.message || 'Registration failed.')
+      }
       console.warn('Backend /auth/register unavailable, using local simulated registration:', err.message)
     }
 
@@ -173,6 +188,7 @@ export function AuthProvider({ children }) {
       organizationName: orgName,
       avatar: '/avatar.jpg',
       createdAt: new Date().toISOString(),
+      emailSent: true,
     }
 
     // Persist registered user & organization
@@ -203,7 +219,7 @@ export function AuthProvider({ children }) {
     try {
       const res = await api('/auth/accept-invite', {
         method: 'POST',
-        body: { token, name, password, email: cleanEmail },
+        body: { token, name, password },
       })
       if (res) {
         const formatted = {
@@ -221,43 +237,44 @@ export function AuthProvider({ children }) {
         return formatted
       }
     } catch (err) {
-      console.warn('Backend /auth/accept-invite error, using local activation:', err.message)
+      if (err instanceof ApiError || err.status || err.message) {
+        throw err
+      }
+      console.warn('Backend /auth/accept-invite error:', err.message)
+      throw err
     }
-
-    // Simulated invite acceptance
-    const acceptedUser = {
-      id: `usr_${Date.now()}`,
-      name: name.trim(),
-      email: cleanEmail,
-      role: assignedRole,
-      roleTitle: assignedRole === 'ADMIN' ? 'Platform Admin' : assignedRole === 'VIEWER' ? 'Telemetry Observer' : 'Platform Deployer',
-      isSuperAdmin: false,
-      organizationName: organizationName || 'Primary Workspace',
-      avatar: '/avatar.jpg',
-      createdAt: new Date().toISOString(),
-    }
-
-    setAuthTokens({
-      accessToken: `mock_jwt_${Date.now()}`,
-      refreshToken: `mock_rf_${Date.now()}`,
-    })
-
-    setUser(acceptedUser)
-    localStorage.removeItem('deploy_portal_logged_out')
-    localStorage.setItem('deploy_portal_user', JSON.stringify(acceptedUser))
-    return acceptedUser
   }
 
   // Super Admin batch onboards team members
-  const onboardMembers = (membersList) => {
+  const onboardMembers = async (membersList) => {
     const existing = JSON.parse(localStorage.getItem('deploy_portal_onboarded_members') || '[]')
     const origin = window.location.origin
     const org = user?.organizationName || 'Engineering'
 
-    const processed = membersList.map((m) => {
-      const token = `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
-      const inviteLink = `${origin}/accept-invite?token=${token}&email=${encodeURIComponent(m.email)}&role=${encodeURIComponent(m.role || 'Deployer')}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(user?.name || 'Super Admin')}`
-      return {
+    const processed = []
+    for (const m of membersList) {
+      let inviteToken = null
+      let inviteLink = null
+      try {
+        const res = await api('/users/invite', {
+          method: 'POST',
+          body: {
+            name: m.name || m.email.split('@')[0],
+            email: m.email.toLowerCase().trim(),
+            role: (m.role || 'Deployer').toUpperCase(),
+            roleTitle: m.roleTitle,
+          },
+        })
+        inviteToken = res?.user?.inviteToken
+        inviteLink = res?.inviteLink
+      } catch (err) {
+        console.warn('Could not invite member via API:', m.email, err.message)
+      }
+
+      const token = inviteToken || `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
+      const link = inviteLink || `${origin}/accept-invite?token=${token}&email=${encodeURIComponent(m.email)}&role=${encodeURIComponent(m.role || 'Deployer')}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(user?.name || 'Super Admin')}`
+
+      processed.push({
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         name: m.name || m.email.split('@')[0],
         email: m.email.toLowerCase().trim(),
@@ -265,14 +282,12 @@ export function AuthProvider({ children }) {
         roleTitle: m.roleTitle || (m.role === 'Admin' ? 'Admin Engineer' : m.role === 'Viewer' ? 'Telemetry Observer' : 'Platform Deployer'),
         status: 'Invited',
         inviteToken: token,
-        inviteLink,
+        inviteLink: link,
         invitedBy: user?.name || 'Super Admin',
         invitedAt: new Date().toISOString(),
-      }
-    })
+      })
+    }
 
-    const updated = [...processed, ...existing]
-    localStorage.setItem('deploy_portal_onboarded_members', JSON.stringify(updated))
     return processed
   }
 
@@ -282,6 +297,47 @@ export function AuthProvider({ children }) {
     setUser(updatedUser)
     localStorage.setItem('deploy_portal_user', JSON.stringify(updatedUser))
     localStorage.setItem('deploy_portal_organization', JSON.stringify({ name: newOrgName }))
+  }
+
+  const updateProfile = async (profileData) => {
+    const res = await api('/auth/profile', {
+      method: 'PATCH',
+      body: profileData,
+    })
+    if (res) {
+      const updatedUser = {
+        ...user,
+        ...res,
+        organizationName: res.organizationName || user?.organizationName,
+      }
+      setUser(updatedUser)
+      localStorage.setItem('deploy_portal_user', JSON.stringify(updatedUser))
+      return updatedUser
+    }
+  }
+
+  const sendTestAlert = async (alertType = 'DEPLOYMENT_SUCCESS') => {
+    return api('/auth/test-alert', {
+      method: 'POST',
+      body: { alertType },
+    })
+  }
+
+  const changePassword = async ({ currentPassword, newPassword }) => {
+    const res = await api('/auth/password', {
+      method: 'PATCH',
+      body: { currentPassword, newPassword },
+    })
+    if (res?.accessToken) {
+      setAuthTokens({
+        accessToken: res.accessToken,
+        refreshToken: res.refreshToken,
+      })
+    }
+    if (res?.csrfToken) {
+      setCsrfToken(res.csrfToken)
+    }
+    return { success: true }
   }
 
   const logout = async () => {
@@ -318,6 +374,37 @@ export function AuthProvider({ children }) {
     })
   }
 
+  const confirmEmail = async (token) => {
+    const res = await api('/auth/confirm-email', {
+      method: 'POST',
+      body: { token },
+    })
+
+    if (res) {
+      const formatted = {
+        ...(user || {}),
+        ...res,
+        isEmailVerified: true,
+        avatar: res.avatar || user?.avatar || '/avatar.jpg',
+        roleTitle: res.roleTitle || user?.roleTitle || (res.role === 'ADMIN' ? 'Super Admin & Owner' : 'Platform Deployer'),
+      }
+      setUser(formatted)
+      localStorage.removeItem('deploy_portal_logged_out')
+      localStorage.setItem('deploy_portal_user', JSON.stringify(formatted))
+      connectSocket()
+      return formatted
+    }
+    return res
+  }
+
+  const resendConfirmation = async (emailToResend) => {
+    const emailTarget = (emailToResend || user?.email || '').toLowerCase().trim()
+    return api('/auth/resend-confirmation', {
+      method: 'POST',
+      body: { email: emailTarget },
+    })
+  }
+
   const isSuperAdmin = user?.role?.toUpperCase() === 'SUPER_ADMIN' || user?.isSuperAdmin === true
   const organizationName = user?.organizationName || 'Primary Workspace'
 
@@ -331,14 +418,20 @@ export function AuthProvider({ children }) {
         loading,
         login,
         register,
+        confirmEmail,
+        resendConfirmation,
         acceptInvite,
         onboardMembers,
         updateOrganization,
+        updateProfile,
+        changePassword,
+        sendTestAlert,
         logout,
         forgotPassword,
         verifyResetToken,
         resetPassword,
         isAuthenticated: !!user,
+        isEmailVerified: !!user?.isEmailVerified,
       }}
     >
       {children}

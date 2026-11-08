@@ -26,13 +26,16 @@ import {
   GitBranch,
   ChevronRight,
   UserPlus,
-  Crown
+  Crown,
+  Server
 } from 'lucide-react'
+import { OnboardingChecklistCard } from '../components/OnboardingChecklistCard'
 
 export function DashboardView() {
   const navigate = useNavigate()
   const searchInputRef = useRef(null)
-  const { role, isSuperAdmin, organizationName } = useAuth()
+  const { user, role, isSuperAdmin, organizationName } = useAuth()
+  const displayName = user?.name || user?.email?.split('@')[0] || 'developer'
   const canRollback = can(role, 'deploy:rollback')
 
   const [environment, setEnvironment] = useState('All')
@@ -232,26 +235,43 @@ export function DashboardView() {
 
   return (
     <div className="space-y-6">
-      {/* Workspace Title & Toolbar Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      {/* 1. Welcome Header (Ploi.io layout) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          {/* Breadcrumbs & Status Beacon */}
-          <div className="flex items-center gap-2 text-[11px] font-mono uppercase tracking-wider text-[#565f6b] font-semibold">
-            {/* <span>WORKSPACE</span>
-            <span className="text-[#8F9CA7]">/</span>
-            <span>CONTROL PLANE</span>
-            <span className="text-[#8F9CA7]">•</span>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono text-[10px] font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              US-EAST HEALTHY
-            </span> */}
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[#101d26] dark:text-white tracking-tight">
+            Welcome back, {displayName}!
+          </h1>
+          <p className="text-xs sm:text-[13px] text-[#565f6b] dark:text-zinc-400 mt-1.5 max-w-3xl leading-relaxed">
+            Ready to dive in? Our onboarding guide will walk you through the essentials, from setting up your first server to deploying apps like a pro. If you ever get stuck, we're just a click away. Let's make something awesome together!
+          </p>
+        </div>
 
+        <div className="shrink-0">
+          <button
+            type="button"
+            onClick={() => navigate('/servers/create')}
+            className="h-10 px-4 rounded-lg bg-[#005459] hover:bg-[#004246] active:bg-[#003538] text-white text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xs"
+          >
+            <Server className="w-4 h-4" />
+            <span>Create server</span>
+          </button>
+        </div>
+      </div>
+
+      {/* 2. Onboarding Guide (0/5) Checklist Card */}
+      <OnboardingChecklistCard
+        serversCount={servers.length}
+        onOpenAddServer={() => navigate('/servers/create')}
+      />
+
+      {/* Workspace Title & Toolbar Header */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pt-2">
+        <div>
           <div className="flex items-baseline gap-3 mt-1">
-            <h1 className="text-[32px] font-bold text-[#101d26] tracking-tight leading-tight">
-              Dashboard
-            </h1>
-            <span className="text-[13px] text-[#565f6b] hidden sm:inline">
+            <h2 className="text-[24px] font-bold text-[#101d26] dark:text-white tracking-tight leading-tight">
+              Platform Activity
+            </h2>
+            <span className="text-[13px] text-[#565f6b] dark:text-zinc-400 hidden sm:inline">
               Real-time platform telemetry &amp; automated release pipelines
             </span>
           </div>
@@ -347,6 +367,15 @@ export function DashboardView() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/platform-admin')}
+              className="h-[30px] px-3 rounded-[5px] bg-[#0E131F] hover:bg-[#1C263D] text-amber-300 border border-amber-500/30 text-[12px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+              title="Super-see all tenants and manage platform activities"
+            >
+              <Crown className="w-3.5 h-3.5 text-amber-400" />
+              <span>Platform Ops</span>
+            </button>
             <button
               type="button"
               onClick={() => navigate('/onboarding')}
