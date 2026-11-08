@@ -1,7 +1,11 @@
 // src/services/api.js
 // Production Fetch Wrapper complying with Slipway API - Frontend Integration Guide
 
-const RAW_URL = import.meta.env.VITE_API_URL?.trim();
+const RAW_URL = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.BACKEND_URL
+)?.trim();
 const BASE = RAW_URL ? `${RAW_URL.replace(/\/$/, '')}/api/v1` : '/api/v1';
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 

@@ -4,7 +4,11 @@
 import { io } from 'socket.io-client';
 import { getAuthToken, refreshSession, api } from './api';
 
-const SOCKET_SERVER_URL = import.meta.env.VITE_API_URL?.trim() || undefined;
+const SOCKET_SERVER_URL = (
+  import.meta.env.VITE_API_URL ||
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.BACKEND_URL
+)?.trim() || undefined;
 
 export const socket = io(SOCKET_SERVER_URL, {
   path: '/socket.io',
