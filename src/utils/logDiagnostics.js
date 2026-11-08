@@ -58,6 +58,42 @@ export function analyzeDeploymentError(logs = [], exitCode = null) {
     }
   }
 
+  // 2b. Missing PM2 Process Manager
+  if (/pm2: command not found/i.test(fullText)) {
+    return {
+      origin: 'server',
+      badge: 'SERVER DAEMON MISSING',
+      badgeColor: 'bg-[#FAF3E7] text-[#B87E0C] border-[#F1D6A4]',
+      iconType: 'server',
+      title: 'PM2 Process Manager Not Found',
+      summary:
+        "The deployment hook uses PM2 for process supervision, but `pm2` is not installed globally or not found in PATH on the destination server.",
+      suggestedFix:
+        'Install PM2 globally on the server (`npm install -g pm2`), or ensure `~/.local/bin` is in PATH. The updated deployment hook will also try npx fallback.',
+      highlightedLine: findLine(/pm2: command not found/i),
+    }
+  }
+
+  // 2c. Backend Unix Domain Socket Communication Error
+  if (
+    /Backend socket communication error/i.test(fullText) ||
+    /Failed to connect to .* over unix:\/\/.*app\.sock/i.test(fullText) ||
+    /503 Service Unavailable.*socket/i.test(fullText)
+  ) {
+    return {
+      origin: 'server',
+      badge: 'BACKEND PROCESS DOWN',
+      badgeColor: 'bg-[#FAEBE9] text-[#C2412D] border-[#F1B5AC]',
+      iconType: 'server',
+      title: 'Node.js Backend Daemon Not Running (Socket Disconnected)',
+      summary:
+        "The web server reverse proxy forwards traffic to a Unix domain socket (app.sock), but the Node.js application process is not active or crashed on startup.",
+      suggestedFix:
+        'Check `pm2 status` on the server to verify your API process is running. Ensure your target post-deploy hook executes `pm2 reload` or `pm2 start`, and verify your project Environment Variables (.env).',
+      highlightedLine: findLine(/Backend socket communication error|Failed to connect.*unix:/i),
+    }
+  }
+
   // 3. Missing PHP Composer on Server
   if (/composer: command not found/i.test(fullText)) {
     return {

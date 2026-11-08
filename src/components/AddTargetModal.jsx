@@ -174,18 +174,19 @@ echo "Release $RELEASE_TIMESTAMP active with ZERO downtime."`
     architecture: 'atomic-symlink',
     isWindows: false,
     script: `# -------------------------------------------------------------
-# Atomic Zero-Downtime Symlink Deployment (Node.js / Express)
+# Atomic Zero-Downtime Symlink Deployment (Node.js / Express API)
 # -------------------------------------------------------------
 export NO_UPDATE_NOTIFIER=1
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" 2>/dev/null || true
-nvm use 22 2>/dev/null || nvm use 20 2>/dev/null || nvm install 20 2>/dev/null || true
-for d in $(ls -d $HOME/.nvm/versions/node/* 2>/dev/null | sort -V -r); do
-  [ -d "$d/bin" ] && export PATH="$d/bin:$PATH" && break
+
+# Auto-discover modern Node.js & PM2 across Hostinger, cPanel, NVM, and Linux VPS
+for p in /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin "$HOME/.local/bin" "$HOME/.npm-global/bin" /usr/local/bin; do
+  [ -d "$p" ] && export PATH="$p:$PATH"
 done
-for p in /opt/cpanel/ea-nodejs22/bin /opt/cpanel/ea-nodejs20/bin /opt/alt/alt-nodejs22/root/usr/bin /opt/alt/alt-nodejs20/root/usr/bin /usr/local/bin /usr/bin; do
-  [ -d "$p" ] && export PATH="$PATH:$p"
-done
+if [ -d "$HOME/.nvm" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" 2>/dev/null || true
+  nvm use 22 2>/dev/null || nvm use 20 2>/dev/null || true
+fi
 
 APP_DIR="$(pwd)"
 RELEASE_TIMESTAMP=$(date +%Y%m%d%H%M%S)
@@ -208,20 +209,40 @@ rm -rf "$RELEASE_DIR/releases" "$RELEASE_DIR/shared" "$RELEASE_DIR/current" 2>/d
 [ -f "$SHARED_DIR/.env" ] && ln -sfn "$SHARED_DIR/.env" "$RELEASE_DIR/.env"
 ln -sfn "$SHARED_DIR/uploads" "$RELEASE_DIR/uploads"
 
-# Install dependencies inside the new release directory
+# Clean up stale socket file before switching release
+rm -f "$APP_DIR/app.sock" "$RELEASE_DIR/app.sock" 2>/dev/null || true
+
+# Install production dependencies inside the new release directory
 cd "$RELEASE_DIR"
-(npm ci --production 2>/dev/null || npm install --production 2>/dev/null || true)
+(npm ci --omit=dev 2>/dev/null || npm install --omit=dev 2>/dev/null || true)
+
+# Run database migrations if Prisma schema exists
+if [ -f "prisma/schema.prisma" ]; then
+  npx prisma migrate deploy 2>/dev/null || true
+fi
 
 # ATOMIC SWITCH: Switch symlink to new release
 ln -sfn "$RELEASE_DIR" "$APP_DIR/current"
 
-# Reload PM2 zero-downtime cluster
-pm2 reload all 2>/dev/null || pm2 restart all 2>/dev/null || pm2 start current/index.js --name "app" 2>/dev/null || true
+# Resolve PM2 executable
+PM2_CMD="pm2"
+command -v pm2 >/dev/null 2>&1 || PM2_CMD="$HOME/.local/bin/pm2"
+command -v "$PM2_CMD" >/dev/null 2>&1 || PM2_CMD="npx --no-install pm2"
+
+# Restart or reload PM2 process
+cd "$APP_DIR"
+if [ -f "ecosystem.config.js" ]; then
+  $PM2_CMD reload ecosystem.config.js 2>/dev/null || $PM2_CMD start ecosystem.config.js 2>/dev/null || true
+else
+  APP_NAME="$(basename "$APP_DIR")"
+  $PM2_CMD reload "$APP_NAME" 2>/dev/null || $PM2_CMD restart "$APP_NAME" 2>/dev/null || $PM2_CMD start current/index.js --name "$APP_NAME" 2>/dev/null || true
+fi
+$PM2_CMD save 2>/dev/null || true
 
 # Prune old releases (keep 5)
 cd "$APP_DIR/releases"
 ls -dt "$APP_DIR/releases"/* | tail -n +6 | xargs rm -rf 2>/dev/null || true
-echo "Atomic switch complete. PM2 workers drained and reloaded with zero dropped connections."`
+echo "Atomic switch complete. PM2 workers reloaded with zero dropped connections."`
   },
   {
     id: 'cpanel-sftp',
