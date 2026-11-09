@@ -21,7 +21,7 @@ const STATIC_NAVIGATION = [
   { id: 'nav-proj', title: 'Projects Catalog', subtitle: 'View all services and pipelines', path: '/projects', icon: FolderGit2, category: 'Navigation' },
   { id: 'nav-serv', title: 'Servers & Clusters', subtitle: 'Manage nodes and target fleet', path: '/servers', icon: Server, category: 'Navigation' },
   { id: 'nav-deps', title: 'Deployments', subtitle: 'Real-time deployment audit & history', path: '/deployments', icon: Rocket, category: 'Navigation' },
-  { id: 'nav-user', title: 'Team & IAM', subtitle: 'Manage organization permissions', path: '/users', icon: Users, category: 'Navigation' },
+  { id: 'nav-user', title: 'Workspaces & Teams', subtitle: 'Manage organization permissions and team members', path: '/teams/members', icon: Users, category: 'Navigation' },
   { id: 'nav-prof', title: 'Profile & Account', subtitle: 'Manage personal profile, credentials & security', path: '/profile', icon: User, category: 'Navigation' },
   { id: 'nav-audi', title: 'Audit Trail', subtitle: 'Cryptographic system audit logs', path: '/audit-log', icon: Clock, category: 'Navigation' },
   { id: 'nav-sett', title: 'Settings', subtitle: 'Cluster origin and webhooks', path: '/settings', icon: Settings, category: 'Navigation' },

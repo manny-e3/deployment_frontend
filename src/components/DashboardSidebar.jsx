@@ -13,7 +13,6 @@ import {
   Building2,
   Sun,
   Moon,
-  CreditCard,
   ChevronRight,
   ChevronDown,
   Check,
@@ -90,10 +89,8 @@ export function DashboardSidebar() {
     { label: 'Projects', icon: FolderGit2, path: '/projects' },
     { label: 'Servers', icon: Server, path: '/servers' },
     { label: 'Deployments', icon: Rocket, path: '/deployments' },
-    { label: 'Users & Team', icon: Users, path: '/users', badge: isSuperAdmin ? 'Onboard' : null },
     { label: 'Audit Log', icon: Clock, path: '/audit-log' },
     { label: 'Settings', icon: Settings, path: '/settings' },
-    { label: 'Subscription', icon: CreditCard, path: '/profile', badge: 'Trial' },
   ]
 
   const isItemActive = (path) => {

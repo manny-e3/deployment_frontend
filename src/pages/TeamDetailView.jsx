@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../context/ToastContext'
 import { api } from '../services/api'
+import { UsersView } from './UsersView'
 
 // Initial default permission keys structure matching Ploi UI
 const INITIAL_PERMISSIONS = {
@@ -501,66 +502,10 @@ export function TeamDetailView() {
         )}
 
         {/* ============================================================ */}
-        {/* TAB 2: MEMBERS */}
+        {/* TAB 2: MEMBERS & ONBOARDING */}
         {/* ============================================================ */}
         {activeTab === 'members' && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-xl font-bold text-zinc-900 dark:text-white tracking-tight">
-                  Team Members
-                </h1>
-                <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  <Link to="/dashboard" className="hover:text-zinc-900 dark:hover:text-zinc-200">
-                    Dashboard
-                  </Link>
-                  <span>/</span>
-                  <span>Teams</span>
-                  <span>/</span>
-                  <span className="text-zinc-700 dark:text-zinc-300 font-medium">Members</span>
-                </div>
-              </div>
-
-              <Link
-                to="/users"
-                className="px-4 py-2 rounded-lg bg-[#005459] hover:bg-[#084246] text-white text-xs font-semibold shadow-xs inline-flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Invite member</span>
-              </Link>
-            </div>
-
-            <div className="bg-white dark:bg-[#0B131D] border border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden shadow-xs">
-              <div className="px-5 py-3 border-b border-zinc-200 dark:border-zinc-800 bg-[#FAFBFB] dark:bg-[#081018] text-xs font-bold text-zinc-800 dark:text-zinc-200">
-                Active Members ({teamMembers.length})
-              </div>
-              <div className="divide-y divide-zinc-200 dark:divide-zinc-800 text-xs">
-                {teamMembers.map((member) => (
-                  <div key={member.id} className="p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-[#005459] text-white flex items-center justify-center font-bold text-xs uppercase">
-                        {(member.name || member.email || 'U')[0]}
-                      </div>
-                      <div>
-                        <div className="font-bold text-zinc-900 dark:text-white">
-                          {member.name || member.email}
-                        </div>
-                        <div className="text-zinc-500 text-[11px]">
-                          {member.email}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-semibold">
-                        {member.role || 'Member'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <UsersView isEmbedded={true} teamTitle={teamTitle} />
         )}
 
         {/* ============================================================ */}

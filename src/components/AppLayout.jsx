@@ -4,7 +4,6 @@ import { DashboardSidebar } from './DashboardSidebar'
 import { DashboardTopBar } from './DashboardTopBar'
 import { ErrorBoundary } from './ErrorBoundary'
 import { CommandPaletteModal } from './CommandPaletteModal'
-import { TrialBanner } from './TrialBanner'
 
 export function AppLayout() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
@@ -36,9 +35,6 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen flex flex-col bg-zinc-50 dark:bg-[#07090D] text-zinc-900 dark:text-zinc-100 font-sans selection:bg-zinc-900 selection:text-white dark:selection:bg-emerald-500/20 dark:selection:text-emerald-300 transition-colors duration-200">
-      {/* 0. Full-Width Trial Alert Banner */}
-      <TrialBanner />
-
       <div className="flex-1 flex min-h-0">
         {/* 1. Sidebar Navigation */}
         <DashboardSidebar />

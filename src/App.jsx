@@ -26,6 +26,9 @@ import {
   AcceptInvite,
   LandingPage,
   PlatformAdminView,
+  TermsOfService,
+  PrivacyPolicy,
+  SecurityArchitecture,
 } from './pages'
 
 function ProtectedRoute({ children }) {
@@ -62,6 +65,12 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/terms-of-service" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route path="/security" element={<SecurityArchitecture />} />
+            <Route path="/security-architecture" element={<SecurityArchitecture />} />
             <Route path="/confirm-email" element={<ConfirmEmail />} />
             <Route path="/confirm-email-pending" element={<ConfirmEmailPending />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -95,7 +104,7 @@ export default function App() {
               <Route path="/servers/create" element={<CreateServerView />} />
               <Route path="/servers/new" element={<CreateServerView />} />
               <Route path="/deployments" element={<DeploymentsView />} />
-              <Route path="/users" element={<UsersView />} />
+              <Route path="/users" element={<Navigate to="/teams/members" replace />} />
               <Route path="/teams" element={<TeamDetailView />} />
               <Route path="/teams/:tab" element={<TeamDetailView />} />
               <Route path="/audit-log" element={<AuditLogView />} />

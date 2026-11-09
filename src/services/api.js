@@ -3,8 +3,7 @@
 
 const RAW_URL = (
   import.meta.env.VITE_API_URL ||
-  import.meta.env.VITE_BACKEND_URL ||
-  import.meta.env.BACKEND_URL
+  import.meta.env.VITE_BACKEND_URL
 )?.trim();
 const BASE = RAW_URL ? `${RAW_URL.replace(/\/$/, '')}/api/v1` : '/api/v1';
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -112,28 +111,28 @@ async function send(path, { method = 'GET', body, query } = {}) {
 
 let refreshing = null; // one refresh shared by every request that hit 401
 export const refreshSession = () =>
-  (refreshing ??= (async () => {
-    try {
-      const rf = getRefreshToken();
-      const res = await send('/auth/refresh', {
-        method: 'POST',
-        body: rf ? { refreshToken: rf } : undefined,
-      });
-      if (!res.ok) return false;
-      const data = await res.json().catch(() => null);
-      if (data?.accessToken || data?.refreshToken) {
-        setAuthTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
-      }
-      if (data?.csrfToken || data?.csrf_token) {
-        setCsrfToken(data.csrfToken || data.csrf_token);
-      }
-      return true;
-    } catch {
-      return false;
-    } finally {
-      refreshing = null;
+(refreshing ??= (async () => {
+  try {
+    const rf = getRefreshToken();
+    const res = await send('/auth/refresh', {
+      method: 'POST',
+      body: rf ? { refreshToken: rf } : undefined,
+    });
+    if (!res.ok) return false;
+    const data = await res.json().catch(() => null);
+    if (data?.accessToken || data?.refreshToken) {
+      setAuthTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
     }
-  })());
+    if (data?.csrfToken || data?.csrf_token) {
+      setCsrfToken(data.csrfToken || data.csrf_token);
+    }
+    return true;
+  } catch {
+    return false;
+  } finally {
+    refreshing = null;
+  }
+})());
 
 export async function api(path, options = {}) {
   let res = await send(path, options);

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Users,
   UserPlus,
@@ -34,7 +35,7 @@ import { useToast } from '../context/ToastContext'
 import { can } from '../utils/permissions'
 import { api, ApiError } from '../services/api'
 
-export function UsersView() {
+export function UsersView({ isEmbedded = false, teamTitle }) {
   const { user: currentUser, role, isSuperAdmin, organizationName } = useAuth()
   const { showToast } = useToast()
   const [users, setUsers] = useState([])
@@ -310,14 +311,28 @@ export function UsersView() {
       {/* 1. Header & Controls */}
       <div>
         {/* Breadcrumb */}
-        <div className="text-[11px] font-mono uppercase tracking-wider text-[#565f6b] font-semibold">
-          PLATFORM <span className="text-[#8F9CA7]">/</span> ACCESS CONTROL <span className="text-[#8F9CA7]">/</span> USERS &amp; ROLES
-        </div>
+        {isEmbedded ? (
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400 mb-1">
+            <Link to="/dashboard" className="hover:text-zinc-900 dark:hover:text-zinc-200">
+              Dashboard
+            </Link>
+            <span>/</span>
+            <Link to="/teams" className="hover:text-zinc-900 dark:hover:text-zinc-200">
+              Teams
+            </Link>
+            <span>/</span>
+            <span className="text-zinc-700 dark:text-zinc-300 font-medium">Team Members</span>
+          </div>
+        ) : (
+          <div className="text-[11px] font-mono uppercase tracking-wider text-[#565f6b] font-semibold">
+            PLATFORM <span className="text-[#8F9CA7]">/</span> ACCESS CONTROL <span className="text-[#8F9CA7]">/</span> USERS &amp; ROLES
+          </div>
+        )}
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mt-1">
           <div className="flex items-center gap-3">
-            <h1 className="text-[26px] font-bold text-[#101d26] tracking-tight leading-tight">
-              Users
+            <h1 className="text-[26px] font-bold text-[#101d26] dark:text-white tracking-tight leading-tight">
+              {isEmbedded ? (teamTitle ? `${teamTitle} Members` : 'Team Members') : 'Users'}
             </h1>
             <span className="px-2 py-0.5 rounded-[4px] bg-[#E2F0FD] text-[#005459] font-mono text-[11px] font-semibold border border-[#BEDDF7]">
               {users.length} members

@@ -35,7 +35,7 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
   })
 
   // Modals state for in-place actions
-  const [activeModal, setActiveModal] = useState(null) // 'git' | 'provider' | 'upgrade' | null
+  const [activeModal, setActiveModal] = useState(null) // 'git' | 'provider' | null
 
   // If user has at least 1 server, Step 3 is automatically considered completed
   const isStep3Completed = serversCount > 0 || Boolean(completedSteps[3])
@@ -76,20 +76,11 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
     },
     {
       id: 4,
-      title: 'Upgrade your plan',
-      badge: null,
-      desc: 'Upgrade your plan to lift restrictions and enjoy the most out of managing your services.',
-      actionLabel: 'Upgrade plan',
-      isCompleted: Boolean(completedSteps[4]),
-      onAction: () => setActiveModal('upgrade')
-    },
-    {
-      id: 5,
       title: 'Enable 2FA',
       badge: 'Optional but recommended',
       desc: 'Enabling 2FA increases the security of your account, you can easily enable this in your profile under the security tab.',
       actionLabel: 'Enable 2FA',
-      isCompleted: Boolean(completedSteps[5]),
+      isCompleted: Boolean(completedSteps[4]),
       onAction: () => navigate('/profile')
     }
   ]
@@ -169,11 +160,10 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
                   type="button"
                   onClick={(e) => handleToggleStep(step.id, e)}
                   title={step.isCompleted ? 'Mark as incomplete' : 'Mark as completed'}
-                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-mono font-bold transition-all cursor-pointer ${
-                    step.isCompleted
+                  className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5 text-xs font-mono font-bold transition-all cursor-pointer ${step.isCompleted
                       ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-800'
                       : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 hover:border-[#005459]'
-                  }`}
+                    }`}
                 >
                   {step.isCompleted ? <Check className="w-4 h-4 stroke-[2.5]" /> : step.id}
                 </button>
@@ -181,11 +171,10 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span
-                      className={`font-bold text-[13.5px] ${
-                        step.isCompleted
+                      className={`font-bold text-[13.5px] ${step.isCompleted
                           ? 'text-zinc-400 dark:text-zinc-500 line-through'
                           : 'text-zinc-900 dark:text-zinc-100'
-                      }`}
+                        }`}
                     >
                       {step.title}
                     </span>
@@ -256,7 +245,7 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
                   key={provider}
                   type="button"
                   onClick={() => {
-                    handleToggleStep(1, { stopPropagation: () => {} })
+                    handleToggleStep(1, { stopPropagation: () => { } })
                     setActiveModal(null)
                   }}
                   className="w-full p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 hover:border-[#005459] dark:hover:border-teal-400 bg-zinc-50 dark:bg-zinc-900 flex items-center justify-between text-xs font-semibold text-zinc-800 dark:text-zinc-200 transition-colors cursor-pointer"
@@ -275,65 +264,10 @@ export function OnboardingChecklistCard({ serversCount = 0, onOpenAddServer }) {
         isOpen={activeModal === 'provider'}
         onClose={() => setActiveModal(null)}
         onSaveProvider={() => {
-          handleToggleStep(2, { stopPropagation: () => {} })
+          handleToggleStep(2, { stopPropagation: () => { } })
           setActiveModal(null)
         }}
       />
-
-      {/* Modal: Upgrade Plan */}
-      {activeModal === 'upgrade' && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-[#10141D] border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 max-w-md w-full shadow-xl space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-bold text-zinc-900 dark:text-white">
-                PortalOps Subscription Plans
-              </h3>
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-              You are currently on the <strong>Trial Plan (5 days remaining)</strong>. Upgrade to unlock unlimited deployments, custom cron daemons, and client workspace isolation.
-            </p>
-
-            <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-sm text-zinc-900 dark:text-white">Developer Pro</span>
-                <span className="font-mono font-bold text-xs text-[#005459] dark:text-teal-400">$14 / mo</span>
-              </div>
-              <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400">
-                Up to 5 servers, zero-downtime symlink deploys, automated database snapshots.
-              </p>
-            </div>
-
-            <div className="pt-2 flex items-center justify-end gap-2.5">
-              <button
-                type="button"
-                onClick={() => setActiveModal(null)}
-                className="h-9 px-4 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleToggleStep(4, { stopPropagation: () => {} })
-                  setActiveModal(null)
-                  navigate('/profile')
-                }}
-                className="h-9 px-4 rounded-lg bg-[#005459] hover:bg-[#004246] active:bg-[#003538] text-white text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Upgrade to Pro
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   )
 }

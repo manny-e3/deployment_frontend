@@ -385,7 +385,7 @@ export function DashboardView() {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/users')}
+              onClick={() => navigate('/teams/members')}
               className="h-[30px] px-3 rounded-[5px] bg-[#005459] hover:bg-[#0B5459] text-white text-[12px] font-medium flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
             >
               <UserPlus className="w-3.5 h-3.5" />
