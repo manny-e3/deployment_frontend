@@ -31,15 +31,6 @@ export function PublicFooter() {
           <div><a href="/#comparison" className="hover:text-zinc-300 transition-colors">PaaS Comparison</a></div>
         </div>
 
-        {/* Col 3: Integrations */}
-        <div className="space-y-2">
-          <div className="font-semibold text-[13px] text-zinc-200">Supported Clouds</div>
-          <div><span className="text-zinc-400">Hetzner Cloud</span></div>
-          <div><span className="text-zinc-400">DigitalOcean</span></div>
-          <div><span className="text-zinc-400">AWS Lightsail &amp; EC2</span></div>
-          <div><span className="text-zinc-400">Linode &amp; Vultr</span></div>
-          <div><span className="text-zinc-400">Custom Bare Metal</span></div>
-        </div>
 
         {/* Col 4: Legal & Security */}
         <div className="space-y-2">

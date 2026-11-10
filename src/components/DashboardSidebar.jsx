@@ -31,25 +31,78 @@ export function DashboardSidebar() {
   const [isWorkspaceMenuOpen, setIsWorkspaceMenuOpen] = useState(false)
   const menuRef = useRef(null)
 
+  const primaryName = organizationName || user?.organizationName || 'Primary Workspace'
+
   const [activeWorkspace, setActiveWorkspace] = useState(() => {
-    return localStorage.getItem('portalops_active_workspace') || organizationName || user?.organizationName || 'Acme Agency'
+    const saved = localStorage.getItem('portalops_active_workspace')
+    if (saved && !['Logistics Pro', 'Dental Care SaaS', 'Acme Agency'].includes(saved)) {
+      return saved
+    }
+    return primaryName
   })
 
   const [clientWorkspaces, setClientWorkspaces] = useState(() => {
     try {
       const stored = localStorage.getItem('portalops_workspaces_list')
-      return stored ? JSON.parse(stored) : [
-        { id: 'ws-primary', name: organizationName || user?.organizationName || 'Acme Agency', badge: 'AGENCY HUB' },
-        { id: 'ws-client-1', name: 'Logistics Pro', badge: 'CLIENT' },
-        { id: 'ws-client-2', name: 'Dental Care SaaS', badge: 'CLIENT' },
-      ]
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter(
+            (ws) =>
+              ws &&
+              !['Logistics Pro', 'Dental Care SaaS', 'Acme Agency'].includes(ws.name) &&
+              !['ws-client-1', 'ws-client-2'].includes(ws.id)
+          )
+          if (filtered.length > 0) return filtered
+        }
+      }
     } catch {
-      return [
-        { id: 'ws-primary', name: 'Acme Agency', badge: 'AGENCY HUB' },
-        { id: 'ws-client-1', name: 'Logistics Pro', badge: 'CLIENT' },
-      ]
+      // ignore
     }
+    return [
+      { id: 'ws-primary', name: primaryName, badge: 'PRIMARY' },
+    ]
   })
+
+  // Synchronize primary workspace name & purge legacy mock names from localStorage
+  useEffect(() => {
+    try {
+      const current = localStorage.getItem('portalops_active_workspace')
+      if (current && ['Logistics Pro', 'Dental Care SaaS', 'Acme Agency'].includes(current)) {
+        localStorage.setItem('portalops_active_workspace', primaryName)
+      }
+      const list = localStorage.getItem('portalops_workspaces_list')
+      if (list) {
+        const parsed = JSON.parse(list)
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(
+            (w) =>
+              w &&
+              !['Logistics Pro', 'Dental Care SaaS', 'Acme Agency'].includes(w.name) &&
+              !['ws-client-1', 'ws-client-2'].includes(w.id)
+          )
+          localStorage.setItem('portalops_workspaces_list', JSON.stringify(cleaned))
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [primaryName])
+
+  useEffect(() => {
+    if (organizationName) {
+      setClientWorkspaces((prev) => {
+        const hasPrimary = prev.some((w) => w.id === 'ws-primary')
+        if (hasPrimary) {
+          return prev.map((w) => (w.id === 'ws-primary' ? { ...w, name: organizationName } : w))
+        }
+        return [{ id: 'ws-primary', name: organizationName, badge: 'PRIMARY' }, ...prev]
+      })
+      if (!activeWorkspace || ['Acme Agency', 'Primary Workspace', 'Logistics Pro', 'Dental Care SaaS'].includes(activeWorkspace)) {
+        setActiveWorkspace(organizationName)
+      }
+    }
+  }, [organizationName])
 
   // Close workspace dropdown on outside click
   useEffect(() => {
@@ -90,7 +143,7 @@ export function DashboardSidebar() {
     { label: 'Servers', icon: Server, path: '/servers' },
     { label: 'Deployments', icon: Rocket, path: '/deployments' },
     { label: 'Audit Log', icon: Clock, path: '/audit-log' },
-    { label: 'Settings', icon: Settings, path: '/settings' },
+    // { label: 'Settings', icon: Settings, path: '/settings' },
   ]
 
   const isItemActive = (path) => {
@@ -134,11 +187,10 @@ export function DashboardSidebar() {
           <button
             type="button"
             onClick={() => setIsWorkspaceMenuOpen(!isWorkspaceMenuOpen)}
-            className={`w-full px-3 py-2 rounded-[6px] border flex items-center justify-between transition-colors group cursor-pointer text-left ${
-              isWorkspaceMenuOpen || location.pathname.startsWith('/teams')
+            className={`w-full px-3 py-2 rounded-[6px] border flex items-center justify-between transition-colors group cursor-pointer text-left ${isWorkspaceMenuOpen || location.pathname.startsWith('/teams')
                 ? 'bg-[#253241] border-[#38485B] text-white shadow-xs'
                 : 'bg-[#141416] border-[#27272A] hover:border-zinc-600 text-zinc-300 hover:text-white'
-            }`}
+              }`}
             title="Switch Client Workspace or Manage Team"
           >
             <div className="flex items-center gap-2 truncate">
@@ -148,7 +200,7 @@ export function DashboardSidebar() {
                   {activeWorkspace}
                 </div>
                 <div className="text-[10px] text-zinc-400 font-mono truncate">
-                  CLIENT WORKSPACE
+                  WORKSPACE
                 </div>
               </div>
             </div>
@@ -159,7 +211,7 @@ export function DashboardSidebar() {
           {isWorkspaceMenuOpen && (
             <div className="absolute left-3 right-3 top-full mt-1.5 z-50 bg-[#161F28] border border-[#2D3D4E] rounded-lg shadow-2xl p-1.5 space-y-1 animate-in fade-in zoom-in-95 duration-150">
               <div className="px-2.5 py-1 text-[10px] font-mono uppercase font-bold text-zinc-400">
-                CLIENT WORKSPACES
+                WORKSPACES
               </div>
 
               {clientWorkspaces.map((ws) => {
@@ -169,16 +221,15 @@ export function DashboardSidebar() {
                     key={ws.id}
                     type="button"
                     onClick={() => handleSelectWorkspace(ws)}
-                    className={`w-full px-2.5 py-1.5 rounded-md flex items-center justify-between text-left transition-colors cursor-pointer text-xs ${
-                      isActive
+                    className={`w-full px-2.5 py-1.5 rounded-md flex items-center justify-between text-left transition-colors cursor-pointer text-xs ${isActive
                         ? 'bg-[#005459] text-white font-semibold'
                         : 'text-zinc-300 hover:bg-[#202C38] hover:text-white'
-                    }`}
+                      }`}
                   >
                     <span className="truncate">{ws.name}</span>
                     <span className="flex items-center gap-1.5 shrink-0">
                       <span className="text-[9px] font-mono opacity-70 border border-white/20 px-1 rounded">
-                        {ws.badge}
+                        {ws.badge === 'AGENCY HUB' ? 'PRIMARY' : ws.badge}
                       </span>
                       {isActive && <Check className="w-3.5 h-3.5 text-[#00DF8F]" />}
                     </span>
@@ -193,7 +244,7 @@ export function DashboardSidebar() {
                   className="w-full px-2.5 py-1.5 rounded-md flex items-center gap-1.5 text-xs text-emerald-400 hover:bg-[#202C38] transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>New Client Workspace</span>
+                  <span>New Workspace</span>
                 </button>
 
                 <Link
@@ -214,11 +265,10 @@ export function DashboardSidebar() {
           <div className="px-3 pt-2 pb-1">
             <Link
               to="/platform-admin"
-              className={`w-full px-3 py-2 rounded-[6px] border flex items-center justify-between transition-all group cursor-pointer ${
-                location.pathname.startsWith('/platform-admin')
+              className={`w-full px-3 py-2 rounded-[6px] border flex items-center justify-between transition-all group cursor-pointer ${location.pathname.startsWith('/platform-admin')
                   ? 'bg-amber-400/15 border-amber-400/40 text-amber-300 font-semibold shadow-xs'
                   : 'bg-[#141416] border-[#27272A] text-zinc-300 hover:text-white hover:border-zinc-600'
-              }`}
+                }`}
               title="Super-see all tenants and manage platform activities"
             >
               <div className="flex items-center gap-2.5 truncate">
@@ -249,11 +299,10 @@ export function DashboardSidebar() {
               <Link
                 key={item.label}
                 to={item.path}
-                className={`w-full h-[40px] px-3 rounded-[6px] flex items-center justify-between text-[14px] font-medium transition-colors cursor-pointer ${
-                  isActive
+                className={`w-full h-[40px] px-3 rounded-[6px] flex items-center justify-between text-[14px] font-medium transition-colors cursor-pointer ${isActive
                     ? 'bg-[#2D3A4B] text-white shadow-xs font-semibold'
                     : 'text-[#8F9CA7] hover:bg-[#253241] hover:text-white'
-                }`}
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-[#8F9CA7]'}`} />
@@ -273,11 +322,10 @@ export function DashboardSidebar() {
       {/* Bottom Profile Section */}
       <div className="p-3 border-t border-[#253241]">
         <div
-          className={`flex items-center justify-between p-2 rounded-[6px] transition-colors ${
-            location.pathname === '/profile'
+          className={`flex items-center justify-between p-2 rounded-[6px] transition-colors ${location.pathname === '/profile'
               ? 'bg-[#253241] ring-1 ring-[#005459]'
               : 'hover:bg-[#253241]/70'
-          }`}
+            }`}
         >
           <Link
             to="/profile"

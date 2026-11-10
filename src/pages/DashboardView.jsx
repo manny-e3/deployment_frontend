@@ -29,7 +29,6 @@ import {
   Crown,
   Server
 } from 'lucide-react'
-import { OnboardingChecklistCard } from '../components/OnboardingChecklistCard'
 
 export function DashboardView() {
   const navigate = useNavigate()
@@ -241,9 +240,9 @@ export function DashboardView() {
           <h1 className="text-2xl sm:text-3xl font-extrabold text-[#101d26] dark:text-white tracking-tight">
             Welcome back, {displayName}!
           </h1>
-          <p className="text-xs sm:text-[13px] text-[#565f6b] dark:text-zinc-400 mt-1.5 max-w-3xl leading-relaxed">
+          {/* <p className="text-xs sm:text-[13px] text-[#565f6b] dark:text-zinc-400 mt-1.5 max-w-3xl leading-relaxed">
             Ready to dive in? Our onboarding guide will walk you through the essentials, from setting up your first server to deploying apps like a pro. If you ever get stuck, we're just a click away. Let's make something awesome together!
-          </p>
+          </p> */}
         </div>
 
         <div className="shrink-0">
@@ -258,11 +257,6 @@ export function DashboardView() {
         </div>
       </div>
 
-      {/* 2. Onboarding Guide (0/5) Checklist Card */}
-      <OnboardingChecklistCard
-        serversCount={servers.length}
-        onOpenAddServer={() => navigate('/servers/create')}
-      />
 
       {/* Workspace Title & Toolbar Header */}
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4 pt-2">
@@ -284,16 +278,15 @@ export function DashboardView() {
             <button
               type="button"
               onClick={() => setActiveViewTab('overview')}
-              className={`px-3 py-1 rounded-[5px] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeViewTab === 'overview'
-                  ? 'bg-white text-[#005459] shadow-2xs font-semibold'
-                  : 'text-[#565f6b] hover:text-[#101d26]'
-              }`}
+              className={`px-3 py-1 rounded-[5px] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${activeViewTab === 'overview'
+                ? 'bg-white text-[#005459] shadow-2xs font-semibold'
+                : 'text-[#565f6b] hover:text-[#101d26]'
+                }`}
             >
               <Activity className="w-3.5 h-3.5" />
               <span>Overview</span>
             </button>
-            <button
+            {/* <button
               type="button"
               onClick={() => setActiveViewTab('dora')}
               className={`px-3 py-1 rounded-[5px] text-[12px] font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
@@ -304,7 +297,7 @@ export function DashboardView() {
             >
               <Zap className="w-3.5 h-3.5" />
               <span>DORA Telemetry</span>
-            </button>
+            </button> */}
           </div>
 
           {/* Search Box */}

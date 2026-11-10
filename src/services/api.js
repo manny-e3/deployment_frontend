@@ -5,7 +5,8 @@ const RAW_URL = (
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_BACKEND_URL
 )?.trim();
-const BASE = RAW_URL ? `${RAW_URL.replace(/\/$/, '')}/api/v1` : '/api/v1';
+const CLEAN_URL = RAW_URL ? RAW_URL.replace(/\/api(\/v1)?\/?$/, '').replace(/\/$/, '') : '';
+const BASE = CLEAN_URL ? `${CLEAN_URL}/api/v1` : '/api/v1';
 const WRITE = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export class ApiError extends Error {
@@ -21,10 +22,11 @@ export class ApiError extends Error {
 
 const TOKEN_KEY = 'deploy_portal_token';
 const REFRESH_TOKEN_KEY = 'deploy_portal_refresh_token';
+const CSRF_KEY = 'deploy_portal_csrf';
 
 let inMemoryToken = localStorage.getItem(TOKEN_KEY) || null;
 let inMemoryRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY) || null;
-let inMemoryCsrfToken = null;
+let inMemoryCsrfToken = localStorage.getItem(CSRF_KEY) || null;
 
 export const getAuthToken = () => inMemoryToken || localStorage.getItem(TOKEN_KEY);
 export const getRefreshToken = () => inMemoryRefreshToken || localStorage.getItem(REFRESH_TOKEN_KEY);
@@ -46,14 +48,19 @@ export const clearAuthTokens = () => {
   inMemoryCsrfToken = null;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem(CSRF_KEY);
 };
 
 export const setCsrfToken = (token) => {
-  if (token) inMemoryCsrfToken = token;
+  if (token) {
+    inMemoryCsrfToken = token;
+    localStorage.setItem(CSRF_KEY, token);
+  }
 };
 
 export const getCsrfToken = () =>
   inMemoryCsrfToken ||
+  localStorage.getItem(CSRF_KEY) ||
   document.cookie
     .split('; ')
     .find((c) => c.startsWith('csrf_token=') || c.startsWith('_csrf='))

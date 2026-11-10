@@ -45,15 +45,7 @@ export function PublicNav() {
       <nav className="hidden lg:flex items-center gap-7 text-[13.5px] font-medium text-zinc-300">
         {/* Features Dropdown */}
         <div className="relative">
-          <button
-            type="button"
-            onClick={() => setIsFeaturesOpen(!isFeaturesOpen)}
-            onMouseEnter={() => setIsFeaturesOpen(true)}
-            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
-          >
-            <span>Features</span>
-            <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-          </button>
+
 
           {isFeaturesOpen && (
             <div
@@ -91,34 +83,9 @@ export function PublicNav() {
         <a href={getSectionHref('#how-it-works')} className="hover:text-white transition-colors">
           How It Works
         </a>
-        <a href={getSectionHref('#providers')} className="hover:text-white transition-colors">
-          Supported Clouds
-        </a>
-        <a href={getSectionHref('#comparison')} className="hover:text-white transition-colors">
-          PaaS vs BYOS
-        </a>
-        <Link
-          to="/security"
-          className={`hover:text-white transition-colors flex items-center gap-1.5 ${location.pathname === '/security' ? 'text-[#00DF8F] font-semibold' : ''
-            }`}
-        >
-          <Shield className="w-3.5 h-3.5 text-[#00DF8F]" />
-          <span>Security</span>
-        </Link>
-        <Link
-          to="/terms"
-          className={`hover:text-white transition-colors ${location.pathname === '/terms' ? 'text-[#00DF8F] font-semibold' : ''
-            }`}
-        >
-          Terms
-        </Link>
-        <Link
-          to="/privacy"
-          className={`hover:text-white transition-colors ${location.pathname === '/privacy' ? 'text-[#00DF8F] font-semibold' : ''
-            }`}
-        >
-          Privacy
-        </Link>
+
+
+
         <a href={getSectionHref('#faq')} className="hover:text-white transition-colors">
           FAQ
         </a>
@@ -126,14 +93,7 @@ export function PublicNav() {
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-        {/* <button
-          type="button"
-          onClick={toggleTheme}
-          className="w-8 h-8 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
-          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-        >
-          {isDark ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4" />}
-        </button> */}
+
 
         {isAuthenticated ? (
           <Link

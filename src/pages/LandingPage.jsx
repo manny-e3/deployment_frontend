@@ -128,56 +128,7 @@ export function LandingPage() {
     setOpenFaqIndex(openFaqIndex === index ? -1 : index)
   }
 
-  const cloudProviders = [
-    {
-      name: 'Hetzner Cloud',
-      price: 'from €3.79/mo',
-      tag: 'Best Value',
-      desc: 'Ultra-fast NVMe cloud instances across Germany, Finland, and US locations.',
-      logo: HetznerLogo,
-      accent: 'border-rose-500/30 group-hover:border-rose-500/60'
-    },
-    {
-      name: 'DigitalOcean',
-      price: 'from $4.00/mo',
-      tag: 'Developer Favorite',
-      desc: 'Fast SSD Droplets, floating IPs, and 1-click snapshot backups.',
-      logo: DigitalOceanLogo,
-      accent: 'border-blue-500/30 group-hover:border-blue-500/60'
-    },
-    {
-      name: 'AWS Lightsail & EC2',
-      price: 'from $3.50/mo',
-      tag: 'Global Scale',
-      desc: 'Enterprise reliability with VPC peering and elastic network interfaces.',
-      logo: AmazonEC2Logo,
-      accent: 'border-amber-500/30 group-hover:border-amber-500/60'
-    },
-    {
-      name: 'Linode / Akamai',
-      price: 'from $5.00/mo',
-      tag: 'High Performance',
-      desc: 'Predictable billing, generous bundled bandwidth, and native API controls.',
-      logo: LinodeLogo,
-      accent: 'border-emerald-500/30 group-hover:border-emerald-500/60'
-    },
-    {
-      name: 'Vultr Cloud',
-      price: 'from $3.50/mo',
-      tag: 'Worldwide Edge',
-      desc: '32+ cloud data centers worldwide with high-frequency compute instances.',
-      logo: VultrLogo,
-      accent: 'border-sky-500/30 group-hover:border-sky-500/60'
-    },
-    {
-      name: 'Custom Bare Metal / VPS',
-      price: 'Any Linux Server',
-      tag: 'Zero Limits',
-      desc: 'Any Ubuntu 20.04/22.04/24.04 or Debian 11/12 machine with standard SSH access.',
-      logo: CustomServerLogo,
-      accent: 'border-teal-500/30 group-hover:border-teal-500/60'
-    }
-  ]
+
 
   const featurePillars = [
     {
@@ -798,74 +749,6 @@ export function LandingPage() {
         </div>
       </section>
 
-      {/* ============================================================== */}
-      {/* 5. Supported Cloud Providers & Zero Markup */}
-      {/* ============================================================== */}
-      <section id="providers" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
-        <div className="text-center mb-12">
-          <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-[#00DF8F]">
-            [ BRING YOUR OWN SERVER ]
-          </span>
-          <h2 className="text-[30px] sm:text-[40px] font-extrabold tracking-tight text-white mt-1.5">
-            Connect any cloud. Pay zero server markups.
-          </h2>
-          <p className="mt-2 text-[14.5px] max-w-xl mx-auto text-zinc-400">
-            Use your existing cloud accounts. You pay the provider directly for your compute with zero middlemen markups.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cloudProviders.map((provider) => {
-            const Logo = provider.logo
-            return (
-              <div
-                key={provider.name}
-                className={`p-6 rounded-2xl border bg-[#081419] transition-all text-left space-y-3 group ${provider.accent}`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center p-2">
-                    <Logo className="w-6 h-6" />
-                  </div>
-                  <span className="font-mono text-[11px] px-2.5 py-0.5 rounded-full bg-white/10 text-teal-300 font-semibold">
-                    {provider.tag}
-                  </span>
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-white flex items-center justify-between">
-                    <span>{provider.name}</span>
-                    <span className="text-xs font-mono text-zinc-400">{provider.price}</span>
-                  </h3>
-                  <p className="mt-2 text-xs sm:text-[13px] text-zinc-400 leading-relaxed">
-                    {provider.desc}
-                  </p>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* BYOS Setup Box Callout */}
-        <div className="mt-10 p-6 rounded-2xl bg-gradient-to-r from-[#005459]/20 via-[#081419] to-[#005459]/20 border border-[#005459]/40 flex flex-col md:flex-row items-center justify-between gap-6 text-left">
-          <div className="space-y-1">
-            <div className="font-bold text-white text-base flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-[#00DF8F]" />
-              <span>Connect in 60 seconds with our automated setup script</span>
-            </div>
-            <div className="text-xs text-zinc-400">
-              Run a single command on your fresh Ubuntu or Debian VPS to link it securely to your PortalOps console.
-            </div>
-          </div>
-          <div className="flex items-center gap-3 shrink-0">
-            <Link
-              to="/servers/create"
-              className="h-10 px-5 rounded-lg bg-[#005459] hover:bg-[#004246] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors border border-teal-500/30"
-            >
-              <span>Provision a Server</span>
-              <ArrowRight className="w-3.5 h-3.5 text-[#00DF8F]" />
-            </Link>
-          </div>
-        </div>
-      </section>
 
       {/* ============================================================== */}
       {/* 6. Core Platform Features Grid */}

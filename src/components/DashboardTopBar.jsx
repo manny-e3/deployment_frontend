@@ -8,14 +8,7 @@ export function DashboardTopBar({ onOpenCommandPalette }) {
     <header className="h-[52px] px-6 bg-white/95 dark:bg-[#090C10]/95 backdrop-blur-xs border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between gap-4 sticky top-0 z-20 select-none transition-colors duration-200">
       {/* Left: Cluster Indicator */}
       <div className="flex items-center gap-3">
-        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-[5px] bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 text-zinc-700 dark:text-zinc-300 text-[11px] font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0" />
-          <span className="font-medium text-zinc-900 dark:text-zinc-100">prod-primary</span>
-          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-          <span className="text-zinc-500 dark:text-zinc-400">us-east-1</span>
-          <span className="text-zinc-300 dark:text-zinc-700">•</span>
-          <span className="text-zinc-500 dark:text-zinc-400">24ms</span>
-        </div>
+
       </div>
 
       {/* Right: Search Bar & Utilities */}

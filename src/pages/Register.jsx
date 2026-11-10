@@ -16,6 +16,7 @@ import { AuthSidePanel } from '../components/AuthSidePanel'
 import { useAuth } from '../context/AuthContext'
 import { useTheme } from '../context/ThemeContext'
 import { useToast } from '../context/ToastContext'
+import { checkDisposableEmail } from '../utils/disposableEmail'
 
 export function Register() {
   const navigate = useNavigate()
@@ -31,9 +32,35 @@ export function Register() {
   const [showPassword, setShowPassword] = useState(false)
   const [agreeTerms, setAgreeTerms] = useState(true)
   const [errorMessage, setErrorMessage] = useState(null)
+  const [emailError, setEmailError] = useState(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [registrationSuccess, setRegistrationSuccess] = useState(false)
   const [isResending, setIsResending] = useState(false)
+
+  const handleEmailChange = (val) => {
+    setEmail(val)
+    if (!val.trim()) {
+      setEmailError(null)
+      return
+    }
+    const check = checkDisposableEmail(val)
+    if (check.isDisposable) {
+      setEmailError(check.message)
+    } else {
+      setEmailError(null)
+    }
+  }
+
+  const handleEmailBlur = () => {
+    if (email.trim()) {
+      const check = checkDisposableEmail(email)
+      if (check.isDisposable) {
+        setEmailError(check.message)
+      } else {
+        setEmailError(null)
+      }
+    }
+  }
 
   // Redirect if already authenticated AND email is verified
   useEffect(() => {
@@ -45,6 +72,13 @@ export function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setErrorMessage(null)
+
+    const check = checkDisposableEmail(email)
+    if (check.isDisposable) {
+      setEmailError(check.message)
+      setErrorMessage(check.message)
+      return
+    }
 
     if (password.length < 6) {
       setErrorMessage('Password must be at least 6 characters long.')
@@ -106,6 +140,7 @@ export function Register() {
 
   const handleOAuthNotice = (provider) => {
     setErrorMessage(null)
+    setEmailError(null)
     setName(`${provider} Developer`)
     setOrganizationName(`${provider} Workspace`)
     setEmail(`dev@${provider.toLowerCase()}.com`)
@@ -257,10 +292,20 @@ export function Register() {
                     type="email"
                     required
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => handleEmailChange(e.target.value)}
+                    onBlur={handleEmailBlur}
                     placeholder="name@company.com"
-                    className="w-full h-10 px-3.5 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm outline-none transition-all focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/20 dark:focus:border-teal-400 dark:focus:ring-teal-400/20 placeholder:text-zinc-400"
+                    className={`w-full h-10 px-3.5 rounded-lg border bg-white dark:bg-zinc-900 text-zinc-900 dark:text-white text-sm outline-none transition-all placeholder:text-zinc-400 ${
+                      emailError
+                        ? 'border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 dark:border-red-500 dark:focus:border-red-500 dark:focus:ring-red-500/20'
+                        : 'border-zinc-300 dark:border-zinc-700 focus:border-[#005459] focus:ring-2 focus:ring-[#005459]/20 dark:focus:border-teal-400 dark:focus:ring-teal-400/20'
+                    }`}
                   />
+                  {emailError && (
+                    <p className="text-[13px] text-red-600 dark:text-red-400 mt-1.5 leading-snug">
+                      {emailError}
+                    </p>
+                  )}
                 </div>
 
                 {/* Password Fields Grid */}

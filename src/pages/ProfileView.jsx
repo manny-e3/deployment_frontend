@@ -337,11 +337,10 @@ export function ProfileView() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`h-[38px] px-3.5 rounded-t-[6px] text-[13px] font-medium flex items-center gap-2 transition-colors cursor-pointer relative ${
-                isActive
-                  ? 'bg-white dark:bg-[#0D1219] text-[#005459] dark:text-teal-300 font-bold border-t border-x border-zinc-200 dark:border-zinc-800 shadow-2xs'
-                  : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/40'
-              }`}
+              className={`h-[38px] px-3.5 rounded-t-[6px] text-[13px] font-medium flex items-center gap-2 transition-colors cursor-pointer relative ${isActive
+                ? 'bg-white dark:bg-[#0D1219] text-[#005459] dark:text-teal-300 font-bold border-t border-x border-zinc-200 dark:border-zinc-800 shadow-2xs'
+                : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800/40'
+                }`}
             >
               <Icon className="w-4 h-4" />
               <span>{tab.label}</span>
@@ -423,7 +422,7 @@ export function ProfileView() {
                 <Building2 className="w-4 h-4 text-[#005459] dark:text-teal-400" />
                 <div className="text-[12px]">
                   <span className="font-semibold text-zinc-900 dark:text-white">{organizationName || 'Primary Workspace'}</span>
-                  <span className="text-zinc-400 text-[11px] font-mono ml-2">ID: {user?.organizationId || 'default'}</span>
+                  <span className="text-zinc-400 text-[11px] font-mono ml-2"> </span>
                 </div>
               </div>
             </div>
@@ -572,37 +571,7 @@ export function ProfileView() {
             </form>
           </div>
 
-          {/* Active Session & Device Hygiene Card */}
-          <div className="bg-white dark:bg-[#0D1219] border border-zinc-200 dark:border-zinc-800 rounded-[8px] p-6 shadow-xs space-y-4">
-            <h3 className="text-[16px] font-bold text-zinc-900 dark:text-white">
-              Active Sessions &amp; Security Hygiene
-            </h3>
 
-            <div className="space-y-3">
-              <div className="p-3.5 rounded-[6px] bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-[5px] bg-[#E2F0FD] dark:bg-[#005459]/30 text-[#005459] dark:text-teal-300 flex items-center justify-center">
-                    <Laptop className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[13px] font-semibold text-zinc-900 dark:text-white flex items-center gap-2">
-                      <span>Current Active Web Session</span>
-                      <span className="px-1.5 py-0.2 rounded text-[10px] font-mono bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold">
-                        THIS DEVICE
-                      </span>
-                    </div>
-                    <div className="text-[11px] font-mono text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Bearer JWT + HTTP-only rotation · CSRF Double Submit active
-                    </div>
-                  </div>
-                </div>
-
-                <div className="text-right text-[11px] font-mono text-zinc-400">
-                  Online now
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -758,62 +727,7 @@ export function ProfileView() {
               </label>
             </div>
 
-            {/* Test Email Delivery Section */}
-            <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-2.5">
-              <div>
-                <h4 className="text-[13px] font-bold text-zinc-800 dark:text-zinc-200 flex items-center gap-1.5">
-                  <Bell className="w-3.5 h-3.5 text-[#005459] dark:text-teal-400" />
-                  <span>Test Alert Delivery</span>
-                </h4>
-                <p className="text-[11.5px] text-zinc-500 dark:text-zinc-400 mt-0.5">
-                  Dispatch a real test alert email to your inbox to confirm SMTP delivery works.
-                </p>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  disabled={!!sendingTestAlert}
-                  onClick={() => handleSendTestAlert('DEPLOYMENT_FAILURE')}
-                  className="h-[32px] px-3 rounded-[5px] bg-[#FAEBE9] hover:bg-red-100 text-[#BA1A1A] dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-300 border border-[#F1B5AC] dark:border-red-900 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {sendingTestAlert === 'DEPLOYMENT_FAILURE' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <AlertCircle className="w-3.5 h-3.5" />
-                  )}
-                  <span>Send Failure Alert</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!!sendingTestAlert}
-                  onClick={() => handleSendTestAlert('DEPLOYMENT_SUCCESS')}
-                  className="h-[32px] px-3 rounded-[5px] bg-[#EBF5EE] hover:bg-emerald-100 text-[#2E8B57] dark:bg-emerald-950/40 dark:hover:bg-emerald-900/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {sendingTestAlert === 'DEPLOYMENT_SUCCESS' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                  )}
-                  <span>Send Success Alert</span>
-                </button>
-
-                <button
-                  type="button"
-                  disabled={!!sendingTestAlert}
-                  onClick={() => handleSendTestAlert('TEAM_JOINED')}
-                  className="h-[32px] px-3 rounded-[5px] bg-[#E2F0FD] hover:bg-teal-100 text-[#005459] dark:bg-teal-950/40 dark:hover:bg-teal-900/60 dark:text-teal-300 border border-[#BEDDF7] dark:border-teal-800 text-[11.5px] font-medium flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  {sendingTestAlert === 'TEAM_JOINED' ? (
-                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <Send className="w-3.5 h-3.5" />
-                  )}
-                  <span>Send Colleague Joined Alert</span>
-                </button>
-              </div>
-            </div>
           </div>
         </div>
       )}
