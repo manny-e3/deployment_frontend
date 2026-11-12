@@ -42,7 +42,8 @@ export class ErrorBoundary extends Component {
               type="button"
               onClick={() => {
                 this.setState({ hasError: false, error: null })
-                window.location.href = '/dashboard'
+                const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+                window.location.href = `${base}/dashboard`
               }}
               className="px-3 py-1.5 bg-[#FFFFFF] border border-[#CDD4D0] text-[#101d26] text-[12px] font-medium rounded-[6px] hover:bg-[#F4F6F5] transition-colors cursor-pointer"
             >

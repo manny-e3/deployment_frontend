@@ -227,10 +227,10 @@ export function TermsOfService() {
                 <div className="p-4 rounded-xl border border-white/10 bg-[#050D11]">
                   <div className="font-semibold text-xs text-white flex items-center gap-1.5 mb-1">
                     <Lock className="w-3.5 h-3.5 text-[#00DF8F]" />
-                    <span>Zero Root Password Storage</span>
+                    <span>Keyless Mode &amp; Scoped Sudoers</span>
                   </div>
                   <p className="text-xs text-zinc-400">
-                    We never persist root passwords to disk or database. Automated provisioning utilizes dedicated deploy users and unique public keys.
+                    Automated 1-line script onboarding requires zero root passwords. Direct SSH credentials are encrypted at rest with AES-256-GCM envelope encryption.
                   </p>
                 </div>
 

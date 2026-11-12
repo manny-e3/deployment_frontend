@@ -17,9 +17,7 @@ export function AuthSidePanel() {
             portalops<span className="text-[#00DF8F]">.online</span>
           </span>
         </Link>
-        <span className="text-[11px] font-mono px-2.5 py-1 rounded-full bg-[#005459]/30 text-teal-300 border border-[#005459]/50 font-semibold">
-          BYOS Cloud v2.4
-        </span>
+
       </div>
 
       {/* Center Hero & 2x2 Feature Grid */}

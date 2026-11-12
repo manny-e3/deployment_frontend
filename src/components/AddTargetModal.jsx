@@ -598,33 +598,82 @@ fi`
   {
     id: 'windows-laravel',
     framework: 'laravel',
-    label: '🪟 Windows Laravel / PHP (XAMPP / Apache)',
+    label: '🪟 Windows Laravel / PHP (WAMP / XAMPP / Apache)',
     badge: 'Windows',
-    desc: 'Composer install, artisan migrate, and Apache .htaccess routing for Windows XAMPP',
+    desc: 'Composer install, artisan migrate, storage permissions, and Apache/WAMP public routing',
     architecture: 'windows-php',
     isWindows: true,
     script: `# -------------------------------------------------------------
-# Windows Server / XAMPP Deployment (Laravel / PHP)
+# Windows Server / WAMP / XAMPP Deployment (Laravel / PHP)
 # -------------------------------------------------------------
-export PATH="/c/xampp/php:/c/ProgramData/ComposerSetup/bin:/c/Program Files/Git/cmd:$PATH"
+# Auto-discover PHP across WAMP, XAMPP, Laragon, and standard paths
+for p in /c/xampp/php /c/laragon/bin/php/php* /c/wamp64/bin/php/php* /c/wamp/bin/php/php* "/c/Program Files/PHP"*; do
+  if [ -d "$p" ] && [ -x "$p/php.exe" ]; then
+    export PATH="$p:/c/ProgramData/ComposerSetup/bin:/c/Program Files/Git/cmd:$PATH"
+    break
+  fi
+done
+
+echo "Ensuring storage and cache folders exist..."
+mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache/data storage/logs storage/app/public bootstrap/cache 2>/dev/null || true
+chmod -R 777 storage bootstrap/cache 2>/dev/null || true
 
 if [ -f "composer.json" ]; then
   echo "Installing Composer dependencies..."
   composer install --no-interaction --prefer-dist --optimize-autoloader --no-dev || true
 fi
 
+if [ ! -f ".env" ] && [ -f ".env.example" ]; then
+  cp -f .env.example .env
+fi
+
 if [ -f "artisan" ]; then
+  if ! grep -qE '^[[:space:]]*APP_KEY=base64:' .env 2>/dev/null; then
+    echo "Generating application encryption key..."
+    php artisan key:generate --force || true
+  fi
   echo "Running database migrations..."
   php artisan migrate --force || true
+  php artisan storage:link 2>/dev/null || true
   php artisan optimize:clear || true
 fi
 
-echo "Ensuring storage and cache folders exist..."
-mkdir -p storage/framework/sessions storage/framework/views storage/framework/cache storage/logs bootstrap/cache 2>/dev/null || true
+# 1. Create root index.php gateway so Apache immediately serves Laravel
+cat << 'PHP_EOF' > index.php
+<?php
+require_once __DIR__ . '/public/index.php';
+PHP_EOF
+chmod 644 index.php 2>/dev/null || true
 
-echo "Configuring Apache .htaccess..."
-if [ -f "public/.htaccess" ] && [ ! -f ".htaccess" ]; then
-  cp -f public/.htaccess .htaccess
+# 2. Create root .htaccess to route requests and block access to .env
+cat << 'HT_EOF' > .htaccess
+Options -Indexes
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule (^|/)\.(?!well-known) - [F,L]
+  RewriteRule ^(app|bootstrap|config|database|resources|routes|storage|tests|vendor)(/|$) - [F,L]
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  RewriteRule ^ public/index.php [L]
+</IfModule>
+HT_EOF
+chmod 644 .htaccess 2>/dev/null || true
+
+# 3. Create WAMP Alias so Apache maps alias directly to public/
+if [ -d "/c/wamp64/alias" ]; then
+  DIR_NAME=$(basename "$(pwd)")
+  WIN_PATH=$(pwd -W 2>/dev/null || cygpath -m "$(pwd)" 2>/dev/null || pwd)
+  cat << WAMP_EOF > "/c/wamp64/alias/\${DIR_NAME}.conf"
+Alias /\${DIR_NAME} "\${WIN_PATH}/public/"
+
+<Directory "\${WIN_PATH}/public/">
+  Options Indexes FollowSymLinks MultiViews
+  AllowOverride All
+  Require all granted
+</Directory>
+WAMP_EOF
+  echo "Configured WAMP Alias: /c/wamp64/alias/\${DIR_NAME}.conf"
 fi
 
 echo "Windows Laravel deployment complete."`

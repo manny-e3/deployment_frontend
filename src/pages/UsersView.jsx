@@ -67,12 +67,13 @@ export function UsersView({ isEmbedded = false, teamTitle }) {
         const res = await api('/users', { query: { limit: 50 } })
         let items = []
         const origin = window.location.origin
+        const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
         const org = organizationName || 'Primary Workspace'
         if (res && res.items && isMounted) {
           items = res.items.map((u) => {
             const isInvited = Boolean(u.inviteToken)
             const inviteLink = isInvited
-              ? `${origin}/accept-invite?token=${encodeURIComponent(u.inviteToken)}&email=${encodeURIComponent(u.email)}&role=${encodeURIComponent(u.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
+              ? `${origin}${base}/accept-invite?token=${encodeURIComponent(u.inviteToken)}&email=${encodeURIComponent(u.email)}&role=${encodeURIComponent(u.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
               : null
             return {
               ...u,
@@ -145,9 +146,10 @@ export function UsersView({ isEmbedded = false, teamTitle }) {
     })
 
     const origin = window.location.origin
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
     const org = organizationName || 'Primary Workspace'
     const token = res?.user?.inviteToken || ''
-    const inviteLink = res?.inviteLink || `${origin}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(newUser.email)}&role=${encodeURIComponent(newUser.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
+    const inviteLink = res?.inviteLink || `${origin}${base}/accept-invite?token=${encodeURIComponent(token)}&email=${encodeURIComponent(newUser.email)}&role=${encodeURIComponent(newUser.role)}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Workspace Admin')}`
 
     const enrichedUser = {
       ...newUser,
@@ -186,7 +188,8 @@ export function UsersView({ isEmbedded = false, teamTitle }) {
   const handleCopyGeneralInvite = () => {
     const org = organizationName || 'Engineering'
     const origin = window.location.origin
-    const link = `${origin}/accept-invite?org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Super Admin')}`
+    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+    const link = `${origin}${base}/accept-invite?org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(currentUser?.name || 'Super Admin')}`
     navigator.clipboard?.writeText(link)
     setCopiedGeneralInvite(true)
     setTimeout(() => setCopiedGeneralInvite(false), 2000)

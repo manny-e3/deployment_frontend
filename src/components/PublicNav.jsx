@@ -1,25 +1,23 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
-  ChevronDown,
   ArrowRight,
-  Sun,
-  Moon,
   Shield,
   Menu,
-  X
+  X,
+  BookOpen,
+  Layers,
+  LifeBuoy,
+  Handshake
 } from 'lucide-react'
 import { SlipwayLogo } from './SlipwayLogo'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
 
 export function PublicNav() {
   const location = useLocation()
   const isHome = location.pathname === '/'
   const { isAuthenticated } = useAuth()
-  const { isDark, toggleTheme } = useTheme()
 
-  const [isFeaturesOpen, setIsFeaturesOpen] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const getSectionHref = (hash) => {
@@ -27,7 +25,7 @@ export function PublicNav() {
   }
 
   return (
-    <header className="h-[74px] px-6 md:px-12 backdrop-blur-md bg-[#061014]/85 border-b border-white/10 flex items-center justify-between sticky top-0 z-50 select-none">
+    <header className="h-[74px] px-6 md:px-12 backdrop-blur-md bg-[#061014]/95 border-b border-white/10 flex items-center justify-between sticky top-0 z-50 w-full select-none shadow-lg shadow-black/20">
       {/* Brand Logo */}
       <Link to="/" className="flex items-center gap-2.5 group">
         <SlipwayLogo size="md" />
@@ -35,66 +33,51 @@ export function PublicNav() {
           <span className="font-bold text-lg tracking-tight text-white">
             portalops<span className="text-[#00DF8F]">.online</span>
           </span>
-          {/* <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#005459]/40 text-teal-300 border border-[#005459]/60 font-semibold">
-            BYOS v2.4
-          </span> */}
+
         </div>
       </Link>
 
       {/* Center Desktop Links */}
       <nav className="hidden lg:flex items-center gap-7 text-[13.5px] font-medium text-zinc-300">
-        {/* Features Dropdown */}
-        <div className="relative">
-
-
-          {isFeaturesOpen && (
-            <div
-              onMouseLeave={() => setIsFeaturesOpen(false)}
-              className="absolute top-full left-0 mt-2 w-64 bg-[#0A161D] border border-white/15 rounded-xl p-2 shadow-2xl space-y-1 backdrop-blur-md z-50"
-            >
-              <a
-                href={getSectionHref('#features')}
-                onClick={() => setIsFeaturesOpen(false)}
-                className="block px-3 py-2 rounded-lg hover:bg-white/10 text-xs font-semibold text-white transition-colors"
-              >
-                <div className="text-teal-300">Zero-Downtime Symlinks</div>
-                <div className="text-[11px] text-zinc-400 font-normal">Atomic pointer swapping in &lt;1ms</div>
-              </a>
-              <a
-                href={getSectionHref('#providers')}
-                onClick={() => setIsFeaturesOpen(false)}
-                className="block px-3 py-2 rounded-lg hover:bg-white/10 text-xs font-semibold text-white transition-colors"
-              >
-                <div className="text-emerald-300">BYOS Cloud VPS</div>
-                <div className="text-[11px] text-zinc-400 font-normal">Hetzner, DigitalOcean, AWS, Linode</div>
-              </a>
-              <a
-                href={getSectionHref('#simulator')}
-                onClick={() => setIsFeaturesOpen(false)}
-                className="block px-3 py-2 rounded-lg hover:bg-white/10 text-xs font-semibold text-white transition-colors"
-              >
-                <div className="text-sky-300">Interactive Simulator</div>
-                <div className="text-[11px] text-zinc-400 font-normal">Live deployment telemetry test</div>
-              </a>
-            </div>
-          )}
-        </div>
-
         <a href={getSectionHref('#how-it-works')} className="hover:text-white transition-colors">
           How It Works
         </a>
 
+        <Link
+          to="/integrations"
+          className={`transition-colors ${location.pathname === '/integrations' ? 'text-[#00DF8F] font-semibold' : 'hover:text-white'}`}
+        >
+          Integrations
+        </Link>
 
-
-        <a href={getSectionHref('#faq')} className="hover:text-white transition-colors">
-          FAQ
+        <a href={getSectionHref('#partners')} className="hover:text-white transition-colors">
+          Partners
         </a>
+
+        <Link
+          to="/docs"
+          className={`transition-colors ${location.pathname === '/docs' ? 'text-[#00DF8F] font-semibold' : 'hover:text-white'}`}
+        >
+          Docs
+        </Link>
+
+        <Link
+          to="/security"
+          className={`transition-colors ${location.pathname === '/security' ? 'text-[#00DF8F] font-semibold' : 'hover:text-white'}`}
+        >
+          Security
+        </Link>
+
+        <Link
+          to="/contact"
+          className={`transition-colors ${location.pathname === '/contact' ? 'text-[#00DF8F] font-semibold' : 'hover:text-white'}`}
+        >
+          Contact
+        </Link>
       </nav>
 
       {/* Right Actions */}
       <div className="flex items-center gap-3">
-
-
         {isAuthenticated ? (
           <Link
             to="/dashboard"
@@ -131,10 +114,10 @@ export function PublicNav() {
         </button>
       </div>
 
-      {/* Mobile Menu Modal */}
+      {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
         <div className="lg:hidden absolute top-[74px] left-0 w-full bg-[#061014] border-b border-white/10 p-6 space-y-4 shadow-2xl z-50">
-          <nav className="flex flex-col space-y-3 text-sm font-medium text-zinc-300">
+          <nav className="flex flex-col space-y-3 text-sm font-medium text-zinc-300 text-left">
             <a
               href={getSectionHref('#how-it-works')}
               onClick={() => setIsMobileMenuOpen(false)}
@@ -142,53 +125,49 @@ export function PublicNav() {
             >
               How It Works
             </a>
-            <a
-              href={getSectionHref('#providers')}
+            <Link
+              to="/integrations"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors flex items-center gap-2"
             >
-              Supported Clouds
-            </a>
+              <Layers className="w-4 h-4 text-sky-400" />
+              <span>Integrations</span>
+            </Link>
             <a
-              href={getSectionHref('#comparison')}
+              href={getSectionHref('#partners')}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors flex items-center gap-2"
             >
-              PaaS vs BYOS
+              <Handshake className="w-4 h-4 text-[#00DF8F]" />
+              <span>Partners &amp; Collaboration</span>
             </a>
+            <Link
+              to="/docs"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="hover:text-white transition-colors flex items-center gap-2"
+            >
+              <BookOpen className="w-4 h-4 text-teal-400" />
+              <span>Documentation</span>
+            </Link>
             <Link
               to="/security"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors flex items-center gap-1.5"
+              className="hover:text-white transition-colors flex items-center gap-2"
             >
-              <Shield className="w-3.5 h-3.5 text-[#00DF8F]" />
-              <span>Security Architecture</span>
+              <Shield className="w-4 h-4 text-[#00DF8F]" />
+              <span>Security Whitepaper</span>
             </Link>
             <Link
-              to="/terms"
+              to="/contact"
               onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors"
+              className="hover:text-white transition-colors flex items-center gap-2"
             >
-              Terms of Service
+              <LifeBuoy className="w-4 h-4 text-amber-400" />
+              <span>Support &amp; Contact</span>
             </Link>
-            <Link
-              to="/privacy"
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors"
-            >
-              Privacy Policy
-            </Link>
-            <a
-              href={getSectionHref('#faq')}
-              onClick={() => setIsMobileMenuOpen(false)}
-              className="hover:text-white transition-colors"
-            >
-              Developer FAQ
-            </a>
           </nav>
         </div>
       )}
     </header>
   )
 }
-

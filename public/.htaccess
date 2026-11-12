@@ -1,9 +1,15 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /
+  RewriteBase /appdeploy/
+
+  # If an existing asset, file, or directory is requested, serve directly
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Stop rewrite if index.html is directly requested
   RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteCond %{REQUEST_FILENAME} !-l
-  RewriteRule . index.html [L]
+
+  # All Single Page Application routes rewrite to /appdeploy/index.html
+  RewriteRule . /appdeploy/index.html [L]
 </IfModule>

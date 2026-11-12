@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite'
 const probePlugin = () => ({
   name: 'health-check-probe-middleware',
   configureServer(server) {
-    server.middlewares.use('/probe-url', async (req, res) => {
+    const handleProbe = async (req, res) => {
       try {
         const parsed = new URL(req.url, 'http://localhost:5173')
         const targetUrl = parsed.searchParams.get('url')
@@ -46,7 +46,10 @@ const probePlugin = () => ({
           error: err.message
         }))
       }
-    })
+    }
+
+    server.middlewares.use('/probe-url', handleProbe)
+    server.middlewares.use('/appdeploy/probe-url', handleProbe)
   }
 })
 
@@ -55,8 +58,12 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const proxyTarget = env.VITE_PROXY_TARGET || 'http://localhost:9000'
 
+  // Default to '/' base for standard root deployment, allow override via VITE_ROUTER_BASE
+  const rawBase = env.VITE_ROUTER_BASE || '/'
+  const base = rawBase === '/' ? '/' : (rawBase.endsWith('/') ? rawBase : `${rawBase}/`)
+
   return {
-    base: './',
+    base,
     plugins: [
       tailwindcss(),
       react(),
@@ -65,6 +72,13 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 5173,
       proxy: {
+        '/appdeploy/api': {
+          target: proxyTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/appdeploy\/api/, '/api'),
+          cookieDomainRewrite: 'localhost',
+        },
         '/api': {
           target: proxyTarget,
           changeOrigin: true,

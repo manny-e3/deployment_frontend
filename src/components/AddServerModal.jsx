@@ -596,7 +596,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                     <li>Pings PortalOps control plane to confirm connection</li>
                   </ul>
                   <p className="text-[11px] text-zinc-400 italic pt-1">
-                    Zero root passwords or private keys are ever shared. Revocable anytime with <code className="font-mono">userdel -r portalops</code>.
+                    Under the 1-line script, zero root passwords or private keys are shared. Revocable anytime with <code className="font-mono">userdel -r portalops</code>.
                   </p>
                 </div>
               </div>
@@ -1089,7 +1089,7 @@ export function AddServerModal({ isOpen, onClose, onSaveServer, serverToEdit = n
                       <span>Zero-Trust Automatic Keypair</span>
                     </div>
                     <p className="text-[11.5px] leading-relaxed text-emerald-700 dark:text-emerald-400">
-                      PortalOps will generate a dedicated Ed25519 keypair for this server upon submission. You never share private keys or root passwords.
+                      PortalOps will generate a dedicated Ed25519 keypair for this server upon submission. Keyless script mode requires zero root passwords.
                     </p>
                   </div>
                 )}

@@ -29,6 +29,11 @@ import {
   TermsOfService,
   PrivacyPolicy,
   SecurityArchitecture,
+  DocsView,
+  FeaturesView,
+  IntegrationsView,
+  ChangelogView,
+  ContactView,
 } from './pages'
 
 function ProtectedRoute({ children }) {
@@ -63,6 +68,11 @@ export default function App() {
           <Routes>
             {/* Public Landing & Auth Routes */}
             <Route path="/" element={<LandingPage />} />
+            <Route path="/docs" element={<DocsView />} />
+            <Route path="/features" element={<FeaturesView />} />
+            <Route path="/integrations" element={<IntegrationsView />} />
+            <Route path="/changelog" element={<ChangelogView />} />
+            <Route path="/contact" element={<ContactView />} />
             <Route path="/login" element={<SignIn />} />
             <Route path="/register" element={<Register />} />
             <Route path="/terms" element={<TermsOfService />} />

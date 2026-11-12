@@ -272,7 +272,8 @@ export function AuthProvider({ children }) {
       }
 
       const token = inviteToken || `inv_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`
-      const link = inviteLink || `${origin}/accept-invite?token=${token}&email=${encodeURIComponent(m.email)}&role=${encodeURIComponent(m.role || 'Deployer')}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(user?.name || 'Super Admin')}`
+      const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '')
+      const link = inviteLink || `${origin}${base}/accept-invite?token=${token}&email=${encodeURIComponent(m.email)}&role=${encodeURIComponent(m.role || 'Deployer')}&org=${encodeURIComponent(org)}&inviter=${encodeURIComponent(user?.name || 'Super Admin')}`
 
       processed.push({
         id: `u-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,

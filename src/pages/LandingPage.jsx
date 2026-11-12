@@ -2,13 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Server,
-  ShieldCheck,
   ArrowRightLeft,
   Terminal,
-  Cpu,
   Database,
   Globe,
-  Zap,
   Users,
   Lock,
   ChevronDown,
@@ -16,29 +13,20 @@ import {
   Activity,
   Layers,
   Check,
-  Copy,
   ArrowRight,
-  CheckCircle2,
   Play,
-  Sun,
-  Moon,
-  ExternalLink,
   Code2,
   RefreshCw,
-  HardDrive,
-  AlertTriangle,
-  Sparkles,
-  Settings,
-  Shield,
   Home,
-  Monitor,
-  GitBranch,
   KeyRound,
-  FileCode2,
   Rocket,
-  Flame,
-  CheckCheck,
-  RotateCcw
+  Sparkles,
+  BookOpen,
+  Shield,
+  Handshake,
+  Building2,
+  Mail,
+  CheckCircle2
 } from 'lucide-react'
 import {
   DigitalOceanLogo,
@@ -46,41 +34,24 @@ import {
   VultrLogo,
   LinodeLogo,
   AmazonEC2Logo,
-  CustomServerLogo,
-  HostingerLogo,
+  CustomServerLogo
 } from '../components/ProviderLogos'
-import { SlipwayLogo } from '../components/SlipwayLogo'
 import { PublicNav } from '../components/PublicNav'
 import { PublicFooter } from '../components/PublicFooter'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
 
 export function LandingPage() {
   const { isAuthenticated } = useAuth()
-  const { isDark, toggleTheme } = useTheme()
-
-  // 1-Line Setup Script copy state
-  const [copiedCli, setCopiedCli] = useState(false)
-  const cliCommand = 'curl -fsSL https://portalops.online/setup.sh | bash'
-
-  const handleCopyCli = () => {
-    navigator.clipboard?.writeText(cliCommand)
-    setCopiedCli(true)
-    setTimeout(() => setCopiedCli(false), 2200)
-  }
-
-  // Features Dropdown state
-  const [isFeaturesOpen, setIsFeaturesOpen] = useState(false)
 
   // Interactive Live Simulator state
-  const [activeSimTab, setActiveSimTab] = useState('pipeline') // 'pipeline' | 'symlink' | 'telemetry'
+  const [activeSimTab, setActiveSimTab] = useState('pipeline')
   const [isDeployingSim, setIsDeployingSim] = useState(false)
   const [simLogs, setSimLogs] = useState([
     { time: '10:42:01', tag: 'WEBHOOK', color: 'text-sky-400', text: 'GitHub push event received: repo acme/storefront (branch: main, commit: 7c4e21d)' },
     { time: '10:42:02', tag: 'GUARD', color: 'text-amber-400', text: 'Preflight guardrails verified: 0 freeze windows, clean working directory' },
     { time: '10:42:03', tag: 'BUILD', color: 'text-teal-400', text: 'Vite production bundle compiled in 1.24s (2,018 modules transformed, 172 kB gzip)' },
     { time: '10:42:04', tag: 'MIGRATE', color: 'text-emerald-400', text: 'Prisma schema synchronized: 2 pending migrations applied safely' },
-    { time: '10:42:05', tag: 'SWAP', color: 'text-purple-400', text: 'Atomic symlink swapped: /releases/20261109-142 -> /current (0ms downtime)' },
+    { time: '10:42:05', tag: 'SWAP', color: 'text-purple-400', text: 'Atomic symlink swapped: /releases/20261112-142 -> /current (0ms downtime)' },
     { time: '10:42:06', tag: 'PROBE', color: 'text-emerald-400', text: 'HTTP 200 OK verified on https://storefront.acme.com across all workers.' }
   ])
 
@@ -94,40 +65,39 @@ export function LandingPage() {
     setTimeout(() => {
       setSimLogs(prev => [
         ...prev,
-        { time: '10:43:01', tag: 'ISOLATION', color: 'text-amber-400', text: 'Assembling new release in /releases/20261109-143 without touching live traffic' }
+        { time: '10:43:01', tag: 'ISOLATION', color: 'text-amber-400', text: 'Assembling new release in /releases/20261112-143 without touching live traffic' }
       ])
-    }, 700)
+    }, 600)
 
     setTimeout(() => {
       setSimLogs(prev => [
         ...prev,
         { time: '10:43:02', tag: 'BUILD', color: 'text-teal-400', text: 'npm ci --prefer-offline && npm run build completed cleanly in 1.1s' }
       ])
-    }, 1400)
+    }, 1200)
 
     setTimeout(() => {
       setSimLogs(prev => [
         ...prev,
         { time: '10:43:03', tag: 'MIGRATE', color: 'text-emerald-400', text: 'Database migrations verified. Zero schema drift.' }
       ])
-    }, 2100)
+    }, 1800)
 
     setTimeout(() => {
       setSimLogs(prev => [
         ...prev,
-        { time: '10:43:04', tag: 'SWAP', color: 'text-purple-400', text: 'Atomic pointer pointed to /releases/20261109-143. 0 dropped packets.' },
+        { time: '10:43:04', tag: 'SWAP', color: 'text-purple-400', text: 'Atomic pointer pointed to /releases/20261112-143. 0 dropped packets.' },
         { time: '10:43:05', tag: 'HEALTH', color: 'text-emerald-400', text: 'Health probe passed: 200 OK. Auto-rollback guard disarmed.' }
       ])
       setIsDeployingSim(false)
-    }, 2800)
+    }, 2400)
   }
 
-  // FAQ Accordion Open/Closed state
+  // FAQ Accordion state
   const [openFaqIndex, setOpenFaqIndex] = useState(0)
   const toggleFaq = (index) => {
     setOpenFaqIndex(openFaqIndex === index ? -1 : index)
   }
-
 
 
   const featurePillars = [
@@ -136,28 +106,28 @@ export function LandingPage() {
       color: 'text-teal-400 bg-teal-500/10 border-teal-500/20',
       title: 'Zero-Downtime Atomic Symlinks',
       badge: '<1ms Swap',
-      description: 'Each deployment builds inside a dedicated, timestamped directory. Once tests pass, the /current symlink swaps in less than 1 millisecond. If a build fails, traffic stays on the previous healthy release.'
+      description: 'Each deployment builds inside a dedicated, timestamped directory. Once tests pass, the /current symlink swaps in less than 1 millisecond. If a build fails, live traffic stays untouched on the previous healthy release.'
     },
     {
       icon: Globe,
       color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
       title: 'Bring Your Own Server (BYOS)',
       badge: 'Zero Markup',
-      description: 'Connect servers from DigitalOcean, Hetzner, AWS, Linode, or bare metal. Pay your provider wholesale prices without paying $250/mo PaaS bandwidth or memory markups.'
+      description: 'Connect servers from Hetzner, DigitalOcean, AWS, Linode, or bare metal. Pay your provider wholesale prices directly without paying $250+/month PaaS memory or bandwidth markups.'
     },
     {
       icon: KeyRound,
       color: 'text-[#00DF8F] bg-[#00DF8F]/10 border-[#00DF8F]/20',
-      title: 'Zero Root Password Storage',
-      badge: 'Isolated User',
-      description: 'A 1-line bash setup script provisions a restricted portalops Linux user with scoped sudo rights and unique Ed25519 keys. We never ask for or store your root password.'
+      title: 'Keyless Onboarding & Zero-Root Isolation',
+      badge: 'Least Privilege',
+      description: 'Connect via our 1-line setup script without ever sharing root credentials, or connect via direct SSH with AES-256-GCM envelope encryption. PortalOps operates under an isolated Linux user with scoped sudo permissions.'
     },
     {
       icon: Terminal,
       color: 'text-sky-400 bg-sky-500/10 border-sky-500/20',
       title: 'Automated Nginx, SSL & Daemons',
       badge: 'Full Automation',
-      description: 'PortalOps provisions reverse proxies, auto-renewing Let\'s Encrypt SSL certificates, PM2 cluster managers, and Supervisor queue workers out of the box.'
+      description: 'PortalOps provisions reverse proxies, auto-renewing Let\'s Encrypt SSL certificates, PM2 cluster managers, and Supervisor queue workers out of the box with zero manual config.'
     },
     {
       icon: Users,
@@ -175,51 +145,6 @@ export function LandingPage() {
     }
   ]
 
-  const comparisonRows = [
-    {
-      feature: 'Monthly Infrastructure Cost (4 vCPU / 8GB RAM)',
-      paas: '$240 – $400 / mo',
-      manual: '$10 – $14 / mo',
-      portalops: '$10 VPS (0% Compute Markup)'
-    },
-    {
-      feature: 'Bandwidth & Egress Markups',
-      paas: 'Massive fees ($0.15 / GB)',
-      manual: 'Included (20TB free on Hetzner/DO)',
-      portalops: '100% Free (Direct provider transfer)'
-    },
-    {
-      feature: 'Initial Server Setup Time',
-      paas: 'Instant (Proprietary platform)',
-      manual: '3 – 5 hours of manual SSH & Nginx',
-      portalops: '60 seconds (1-line setup command)'
-    },
-    {
-      feature: 'Zero-Downtime Atomic Symlinks',
-      paas: 'Proprietary container rebuilds',
-      manual: 'Fragile custom bash scripts',
-      portalops: 'Native atomic directory pointer swap'
-    },
-    {
-      feature: 'Server & Code Ownership',
-      paas: 'Vendor locked into proprietary runtime',
-      manual: '100% yours, but high maintenance',
-      portalops: '100% your servers & your code'
-    },
-    {
-      feature: 'Multi-Tenant Client & Agency Workspaces',
-      paas: 'Expensive enterprise tier ($$$)',
-      manual: 'None (everyone shares root SSH)',
-      portalops: 'Included out of the box with RBAC'
-    },
-    {
-      feature: 'SSH Key & Credential Security',
-      paas: 'Black box runtime environment',
-      manual: 'Root credentials exposed in scripts',
-      portalops: 'Zero root keys · AES-256-GCM vault'
-    }
-  ]
-
   const howItWorksSteps = [
     {
       step: '01',
@@ -231,7 +156,7 @@ export function LandingPage() {
     {
       step: '02',
       title: 'Configure Your Application Stack',
-      desc: 'Select Node.js / PM2 (Next.js, Express, NestJS), PHP / Laravel, or Static SPA (Vite, React). PortalOps sets up Nginx, auto-renewing Let\'s Encrypt SSL, and queue workers.',
+      desc: 'Select Node.js / PM2 (Next.js, Express, NestJS), PHP / Laravel, or Static SPA (Vite, React). PortalOps automatically sets up Nginx, auto-renewing Let\'s Encrypt SSL, and queue workers.',
       icon: Layers,
       badge: 'Zero Config'
     },
@@ -247,7 +172,7 @@ export function LandingPage() {
   const faqItems = [
     {
       q: 'How does PortalOps connect to my server? Do I have to share my root password?',
-      a: 'Never. You run a single copy-paste bash setup command on your fresh VPS. It provisions a dedicated, restricted "portalops" system user with isolated permissions and places a unique Ed25519 SSH public key into authorized_keys. We never ask for your root password, and you can revoke access anytime by deleting the key.'
+      a: 'No, it is completely optional. The recommended method is our 1-line bash setup script, which runs locally on your VPS to provision an isolated "portalops" system user with Ed25519 public keys—you never have to enter or transmit your root password to PortalOps. If you prefer direct SSH connections, PortalOps also supports direct key or password auth, protected by AES-256-GCM envelope encryption at rest.'
     },
     {
       q: 'Can I bring my existing servers from DigitalOcean, Hetzner, or AWS?',
@@ -266,14 +191,14 @@ export function LandingPage() {
       a: 'Yes! PortalOps includes built-in Multi-Tenant Workspace isolation. You can spin up a dedicated workspace for each client or team, invite their members with role-based permissions (Owner, Admin, Member, Deployer), and ensure they only see their assigned servers, deployments, and environment variables.'
     },
     {
-      q: 'Do I need a credit card or subscription to use PortalOps?',
-      a: 'No. PortalOps provides a completely free, self-sovereign control plane with zero credit card requirements and zero hidden fees. You only pay your chosen cloud provider directly for your VPS compute.'
+      q: 'Do I need a credit card to use PortalOps?',
+      a: 'No. PortalOps provides a self-sovereign control plane with zero credit card requirements. You only pay your chosen cloud provider directly for your VPS compute.'
     }
   ]
 
   return (
-    <div className="min-h-screen font-sans flex flex-col relative overflow-hidden bg-[#061014] text-white selection:bg-[#00DF8F] selection:text-zinc-950">
-      {/* Deep PortalOps Ambient Spotlights */}
+    <div className="min-h-screen font-sans flex flex-col relative overflow-x-clip bg-[#061014] text-white selection:bg-[#00DF8F] selection:text-zinc-950">
+      {/* Ambient Lighting Background */}
       <div
         className="absolute top-0 left-0 w-[800px] h-[700px] pointer-events-none blur-[140px] -z-10 opacity-70"
         style={{
@@ -293,30 +218,29 @@ export function LandingPage() {
         }}
       />
 
-      {/* 1. Global Navigation Bar */}
+      {/* Global Navigation */}
       <PublicNav />
 
       {/* ============================================================== */}
-      {/* 2. Hero Section: Split 2-Column */}
+      {/* 1. Hero Section: Split 2-Column with High First-Glance Clarity */}
       {/* ============================================================== */}
-      <section className="pt-12 sm:pt-16 pb-20 px-6 md:px-12 max-w-[1320px] mx-auto w-full">
+      <section className="pt-12 sm:pt-16 pb-16 px-6 md:px-12 max-w-[1320px] mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          {/* LEFT COLUMN: Headline & CTA */}
+          {/* Left Column: Clear Value Prop & CTAs */}
           <div className="lg:col-span-6 flex flex-col items-start text-left">
             {/* Live Status Pill */}
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-zinc-300 mb-6 backdrop-blur-xs select-none">
               <span className="w-2 h-2 rounded-full bg-[#00DF8F] animate-pulse" />
               <span className="font-semibold text-white">PortalOps BYOS Control Plane</span>
               <span className="text-zinc-500">•</span>
-              <span className="text-teal-300 font-mono text-[11px]">Zero Root Key Storage</span>
+              <span className="text-teal-300 font-mono text-[11px]">Keyless Setup &amp; Zero-Root Isolation</span>
             </div>
 
             {/* Main Headline */}
-            <h1 className="text-4xl sm:text-5xl lg:text-[58px] font-black tracking-tight text-white leading-[1.08] text-balance">
-              Deploy sites &amp; servers on{' '}
+            <h1 className="text-4xl sm:text-5xl lg:text-[56px] font-black tracking-tight text-white leading-[1.08] text-balance">
+              The developer experience of Vercel.{' '}
               <span className="relative inline-block text-transparent bg-clip-text bg-gradient-to-r from-[#00DF8F] via-teal-300 to-sky-300">
-                your own cloud.
-                {/* Curved Underline Swoosh */}
+                On your own cloud servers.
                 <svg
                   className="absolute -bottom-2 left-0 w-full h-3 text-[#005459]"
                   viewBox="0 0 250 20"
@@ -333,86 +257,59 @@ export function LandingPage() {
 
             {/* Subtitle */}
             <p className="mt-6 text-zinc-400 text-base sm:text-lg leading-relaxed max-w-lg">
-              Connect any VPS from Hetzner, DigitalOcean, AWS, or bare metal in 60 seconds. PortalOps automates Nginx, Let's Encrypt SSL, Node.js/PM2, Laravel, and zero-downtime atomic symlinks without storing your root password.
+              Connect any VPS from Hetzner, DigitalOcean, AWS, or bare metal in 60 seconds. PortalOps automates Nginx reverse proxies, SSL certificates, PM2 daemons, and zero-downtime atomic symlinks with 0% compute markup.
             </p>
 
-            {/* CTA Buttons */}
+            {/* Primary & Secondary CTAs */}
             <div className="mt-8 flex flex-wrap items-center gap-3.5 w-full sm:w-auto">
               <Link
                 to={isAuthenticated ? '/dashboard' : '/register'}
-                className="h-12 px-6 rounded-lg bg-[#005459] hover:bg-[#004246] active:bg-[#003538] text-white font-semibold text-sm inline-flex items-center justify-center gap-2 transition-all shadow-lg shadow-teal-950/50 cursor-pointer border border-teal-500/20"
+                className="h-12 px-7 rounded-xl bg-[#00DF8F] hover:bg-[#00c57d] text-zinc-950 font-bold text-sm inline-flex items-center justify-center gap-2 transition-all shadow-xl shadow-emerald-950/40 cursor-pointer"
               >
-                <span>Deploy your app now</span>
-                <ArrowRight className="w-4 h-4 text-[#00DF8F]" />
+                <span>{isAuthenticated ? 'Open Console' : 'Start Deploying Free'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+
+              <Link
+                to="/docs"
+                className="h-12 px-6 rounded-xl bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/15 text-white font-medium text-sm inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
+              >
+                <BookOpen className="w-4 h-4 text-teal-300" />
+                <span>Documentation</span>
               </Link>
 
               <a
                 href="#simulator"
-                className="h-12 px-6 rounded-lg bg-white/5 hover:bg-white/10 active:bg-white/15 border border-white/15 text-white font-medium text-sm inline-flex items-center justify-center transition-all cursor-pointer"
+                className="h-12 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
               >
-                <span>Live Deploy Simulator</span>
+                <Play className="w-3.5 h-3.5 text-[#00DF8F]" />
+                <span>Live Simulator</span>
               </a>
-
-              <Link
-                to="/security"
-                className="h-12 px-4 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 text-xs font-semibold inline-flex items-center gap-1.5 transition-colors"
-              >
-                <Shield className="w-4 h-4 text-[#00DF8F]" />
-                <span>Security Whitepaper</span>
-              </Link>
             </div>
 
             {/* Trust Subtext */}
-            <div className="mt-5 flex flex-wrap items-center gap-4 text-xs text-zinc-400 font-medium">
+            <div className="mt-6 flex flex-wrap items-center gap-4 text-xs text-zinc-400 font-medium">
               <div className="flex items-center gap-1.5">
                 <Check className="w-4 h-4 text-[#00DF8F] shrink-0" />
-                <span>100% BYOS Server Sovereignty</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Check className="w-4 h-4 text-[#00DF8F] shrink-0" />
-                <span>Zero Root Passwords Stored</span>
+                <span>100% BYOS Sovereignty</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Check className="w-4 h-4 text-[#00DF8F] shrink-0" />
-                <span>Zero PaaS Markups</span>
+                <span>Internal Tools &amp; Hosting Ready</span>
               </div>
-            </div>
-
-            {/* 1-Line Setup Script Box */}
-            <div className="mt-7 flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-lg bg-[#071319] border border-[#005459]/40 font-mono text-xs text-zinc-300 w-full max-w-[480px] shadow-inner">
-              <div className="flex items-center gap-2 truncate">
-                <span className="text-[#00DF8F] font-bold">$</span>
-                <span className="truncate">{cliCommand}</span>
+              <div className="flex items-center gap-1.5">
+                <Check className="w-4 h-4 text-[#00DF8F] shrink-0" />
+                <span>Zero Compute Markup</span>
               </div>
-              <button
-                type="button"
-                onClick={handleCopyCli}
-                className="px-2.5 py-1 rounded bg-[#005459]/40 hover:bg-[#005459]/70 text-[11px] font-sans font-medium text-teal-200 border border-teal-500/30 flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                title="Copy 1-line script"
-              >
-                {copiedCli ? (
-                  <>
-                    <Check className="w-3 h-3 text-[#00DF8F]" />
-                    <span className="text-[#00DF8F]">Copied</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3 h-3" />
-                    <span>Copy</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
 
-          {/* RIGHT COLUMN: macOS Mockup Window Card */}
+          {/* Right Column: High-Fidelity Interactive Mockup Card */}
           <div className="lg:col-span-6 relative">
-            {/* Glow backing */}
-            <div className="absolute -inset-1 rounded-2xl bg-gradient-to-r from-[#005459]/30 to-[#00DF8F]/20 blur-xl opacity-75 -z-10" />
+            <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-[#005459]/40 to-[#00DF8F]/25 blur-2xl opacity-75 -z-10" />
 
-            {/* Window Card */}
             <div className="rounded-2xl border border-white/15 bg-[#081419]/95 backdrop-blur-xl shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] overflow-hidden text-left relative">
-              {/* Window Title Bar */}
+              {/* Window Header */}
               <div className="px-4 py-3 bg-[#061014] border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full bg-[#FF5F56]" />
@@ -428,23 +325,19 @@ export function LandingPage() {
                 <div className="w-10" />
               </div>
 
-              {/* Window Body: Sidebar + Main Content */}
+              {/* Window Body */}
               <div className="flex">
-                {/* Mini Sidebar */}
                 <div className="w-12 bg-[#040B0E] border-r border-white/5 py-4 flex flex-col items-center gap-4 text-zinc-500 shrink-0">
-                  <Home className="w-4 h-4 hover:text-zinc-300 transition-colors cursor-pointer" />
+                  <Home className="w-4 h-4 hover:text-zinc-300 transition-colors" />
                   <div className="w-7 h-7 rounded-md bg-[#005459]/40 text-[#00DF8F] flex items-center justify-center">
                     <Server className="w-4 h-4" />
                   </div>
-                  <Database className="w-4 h-4 hover:text-zinc-300 transition-colors cursor-pointer" />
-                  <Shield className="w-4 h-4 hover:text-zinc-300 transition-colors cursor-pointer" />
-                  <Code2 className="w-4 h-4 hover:text-zinc-300 transition-colors cursor-pointer" />
-                  <Settings className="w-4 h-4 hover:text-zinc-300 transition-colors cursor-pointer" />
+                  <Database className="w-4 h-4 hover:text-zinc-300 transition-colors" />
+                  <Shield className="w-4 h-4 hover:text-zinc-300 transition-colors" />
+                  <Code2 className="w-4 h-4 hover:text-zinc-300 transition-colors" />
                 </div>
 
-                {/* Main Content Area */}
                 <div className="flex-1 p-5 sm:p-6 space-y-4">
-                  {/* Server Header */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 rounded-lg bg-[#005459]/30 border border-[#005459]/60 text-[#00DF8F] flex items-center justify-center shrink-0">
@@ -453,9 +346,10 @@ export function LandingPage() {
                       <div>
                         <div className="text-sm font-bold text-white flex items-center gap-2">
                           <span>stellar-phoenix</span>
+                          <span className="text-[10px] font-mono text-teal-300 bg-teal-500/10 px-1.5 py-0.2 rounded">Hetzner Cloud</span>
                         </div>
                         <div className="text-xs text-zinc-400">
-                          Hetzner Cloud · 4 vCPU · Ubuntu 24.04 LTS · Frankfurt
+                          4 vCPU · 8GB RAM · Ubuntu 24.04 LTS · Frankfurt
                         </div>
                       </div>
                     </div>
@@ -466,9 +360,8 @@ export function LandingPage() {
                     </div>
                   </div>
 
-                  {/* Telemetry Stats Row */}
+                  {/* Telemetry Stats */}
                   <div className="grid grid-cols-3 gap-2.5">
-                    {/* CPU */}
                     <div className="p-2.5 rounded-lg bg-[#050D11] border border-white/5 space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-zinc-400 font-semibold">CPU</span>
@@ -479,7 +372,6 @@ export function LandingPage() {
                       </div>
                     </div>
 
-                    {/* MEMORY */}
                     <div className="p-2.5 rounded-lg bg-[#050D11] border border-white/5 space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-zinc-400 font-semibold">MEMORY</span>
@@ -490,7 +382,6 @@ export function LandingPage() {
                       </div>
                     </div>
 
-                    {/* DISK */}
                     <div className="p-2.5 rounded-lg bg-[#050D11] border border-white/5 space-y-1.5">
                       <div className="flex items-center justify-between text-[11px] font-mono">
                         <span className="text-zinc-400 font-semibold">DISK</span>
@@ -512,14 +403,12 @@ export function LandingPage() {
                       <span className="text-zinc-500">main · 8e3f1a2</span>
                     </div>
 
-                    <div className="text-zinc-400">• git pull origin main</div>
+                    <div className="text-zinc-400">• git pull origin main (Vite 8.3)</div>
                     <div className="text-teal-400/90">✓ 8 files changed, 412 insertions(+)</div>
-                    <div className="text-zinc-400">• npm ci --prefer-offline</div>
-                    <div className="text-zinc-400">• npm run build (Vite 8.3)</div>
                     <div className="text-zinc-400">• npx prisma migrate deploy</div>
-                    <div className="text-purple-400">• ln -sfn /releases/20261109-143 /current</div>
+                    <div className="text-purple-400">• ln -sfn /releases/20261112-143 /current</div>
                     <div className="text-[#00DF8F] font-semibold pt-1 flex items-center gap-1.5">
-                      <span>🚀 Atomic release live (0ms downtime)</span>
+                      <span>🚀 Atomic release live (&lt;1ms swap, 0 dropped packets)</span>
                     </div>
                   </div>
                 </div>
@@ -541,7 +430,55 @@ export function LandingPage() {
       </section>
 
       {/* ============================================================== */}
-      {/* 3. How It Works Section */}
+      {/* 2. Supported Cloud Providers & Frameworks Strip */}
+      {/* ============================================================== */}
+      <section id="providers" className="py-12 border-y border-white/10 bg-[#040A0D]/70 select-none">
+        <div className="max-w-[1240px] mx-auto px-6 text-center space-y-6">
+          <p className="text-xs uppercase tracking-widest font-mono text-zinc-400 font-semibold">
+            Seamlessly compatible with your preferred cloud infrastructure &amp; stacks
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 opacity-85 hover:opacity-100 transition-opacity">
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <HetznerLogo className="w-6 h-6" />
+              <span>Hetzner Cloud</span>
+            </div>
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <DigitalOceanLogo className="w-6 h-6" />
+              <span>DigitalOcean</span>
+            </div>
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <AmazonEC2Logo className="w-6 h-6" />
+              <span>AWS EC2</span>
+            </div>
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <VultrLogo className="w-6 h-6" />
+              <span>Vultr</span>
+            </div>
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <LinodeLogo className="w-6 h-6" />
+              <span>Linode</span>
+            </div>
+            <div className="flex items-center gap-2.5 font-semibold text-sm text-zinc-300">
+              <CustomServerLogo className="w-6 h-6" />
+              <span>Bare Metal Linux</span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex flex-wrap items-center justify-center gap-2 text-[11px] font-mono text-zinc-400">
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-teal-300">Node.js / PM2</span>
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-rose-300">PHP / Laravel</span>
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-emerald-300">Next.js &amp; Vite</span>
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-sky-300">PostgreSQL</span>
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-red-300">Redis</span>
+            <span className="px-2.5 py-1 rounded bg-white/5 border border-white/10 text-purple-300">Docker</span>
+          </div>
+        </div>
+      </section>
+
+
+      {/* ============================================================== */}
+      {/* 4. How It Works Section */}
       {/* ============================================================== */}
       <section id="how-it-works" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
         <div className="text-center mb-14">
@@ -574,9 +511,7 @@ export function LandingPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-bold text-white">{step.title}</h3>
-                  </div>
+                  <h3 className="text-lg font-bold text-white">{step.title}</h3>
                   <p className="text-xs sm:text-[13px] text-zinc-400 leading-relaxed">
                     {step.desc}
                   </p>
@@ -594,164 +529,7 @@ export function LandingPage() {
       </section>
 
       {/* ============================================================== */}
-      {/* 4. Interactive Live Fleet & Deployment Simulator */}
-      {/* ============================================================== */}
-      <section id="simulator" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
-        <div className="text-center mb-10">
-          <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-[#00DF8F]">
-            [ INTERACTIVE PLATFORM SIMULATOR ]
-          </span>
-          <h2 className="text-[30px] sm:text-[38px] font-extrabold tracking-tight text-white mt-1.5">
-            Experience atomic zero-downtime releases live.
-          </h2>
-          <p className="mt-2 text-[14.5px] max-w-xl mx-auto text-zinc-400">
-            Click simulate below to test preflight checks, isolated builds, atomic symlink pointer swaps, and automated rollback guards in real time.
-          </p>
-        </div>
-
-        {/* Tab Controls Bar */}
-        <div className="flex items-center justify-center gap-2 mb-4">
-          <button
-            type="button"
-            onClick={() => setActiveSimTab('pipeline')}
-            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${activeSimTab === 'pipeline'
-              ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
-              : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
-              }`}
-          >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>1. Live Pipeline &amp; Logs</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSimTab('symlink')}
-            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${activeSimTab === 'symlink'
-              ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
-              : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
-              }`}
-          >
-            <ArrowRightLeft className="w-3.5 h-3.5" />
-            <span>2. Atomic Symlink Architecture</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveSimTab('telemetry')}
-            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${activeSimTab === 'telemetry'
-              ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
-              : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
-              }`}
-          >
-            <Activity className="w-3.5 h-3.5" />
-            <span>3. Host Telemetry &amp; Vitals</span>
-          </button>
-        </div>
-
-        {/* Main Terminal Window */}
-        <div className="w-full max-w-[1020px] mx-auto bg-[#050D11] border border-white/10 rounded-xl overflow-hidden shadow-2xl text-left font-mono text-[12px] text-zinc-300">
-          {/* Terminal Title Bar */}
-          <div className="h-[42px] px-4 bg-[#081419] border-b border-white/10 flex items-center justify-between text-zinc-400">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[#FF5F56]" />
-              <span className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
-              <span className="w-3 h-3 rounded-full bg-[#27C93F]" />
-              <span className="ml-2 text-[11.5px] text-zinc-400 font-medium">portalops-runner@hetzner-fsn1-01</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <span className="text-[11px] text-zinc-400">STATUS: READY</span>
-              <button
-                type="button"
-                onClick={runSimulatedDeploy}
-                disabled={isDeployingSim}
-                className="h-7 px-3 rounded bg-[#005459] hover:bg-[#004246] text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 border border-teal-500/30"
-              >
-                <Play className="w-3 h-3 fill-current text-[#00DF8F]" />
-                <span>{isDeployingSim ? 'Deploying...' : 'Simulate Trigger'}</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Terminal Content by Tab */}
-          <div className="p-6 min-h-[280px]">
-            {activeSimTab === 'pipeline' && (
-              <div className="space-y-2">
-                {simLogs.map((log, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <span className="text-zinc-600 select-none">{log.time}</span>
-                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border border-current/20 ${log.color}`}>
-                      {log.tag}
-                    </span>
-                    <span className="text-zinc-300">{log.text}</span>
-                  </div>
-                ))}
-                {isDeployingSim && (
-                  <div className="flex items-center gap-2 text-[#00DF8F] pt-2">
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                    <span>Executing deployment pipeline hooks...</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {activeSimTab === 'symlink' && (
-              <div className="space-y-4">
-                <div className="p-4 rounded-lg bg-[#081419] border border-white/10 space-y-2">
-                  <div className="text-xs font-bold text-white flex items-center gap-2">
-                    <ArrowRightLeft className="w-4 h-4 text-[#00DF8F]" />
-                    <span>Atomic Symlink Swap Pattern</span>
-                  </div>
-                  <p className="text-zinc-400 text-[11.5px] leading-relaxed">
-                    Zero-downtime deploys work by assembling builds inside timestamped release folders. Only when all tests pass is the symlink swapped atomically in under 1 millisecond.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
-                    <div className="text-zinc-500 font-mono text-[10px]">STEP 1: ISOLATED BUILD</div>
-                    <div className="font-bold text-white mt-1">Build Release</div>
-                    <div className="text-zinc-400 text-[11px] mt-1">/releases/20261109-143</div>
-                  </div>
-                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
-                    <div className="text-zinc-500 font-mono text-[10px]">STEP 2: ATOMIC SWAP</div>
-                    <div className="font-bold text-[#00DF8F] mt-1">ln -sfn Pointer</div>
-                    <div className="text-zinc-400 text-[11px] mt-1">Swaps to /current (&lt;1ms)</div>
-                  </div>
-                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
-                    <div className="text-zinc-500 font-mono text-[10px]">STEP 3: AUTOMATED ROLLBACK</div>
-                    <div className="font-bold text-teal-400 mt-1">Instant Revert</div>
-                    <div className="text-zinc-400 text-[11px] mt-1">Points back on 500 error</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeSimTab === 'telemetry' && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
-                  <div className="text-xs text-zinc-400 font-semibold">CPU LOAD</div>
-                  <div className="text-2xl font-bold text-white font-mono mt-1">18.4%</div>
-                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ Nominal across 4 cores</div>
-                </div>
-                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
-                  <div className="text-xs text-zinc-400 font-semibold">MEMORY USAGE</div>
-                  <div className="text-2xl font-bold text-white font-mono mt-1">2.1 / 8.0 GB</div>
-                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ 73% free RAM buffer</div>
-                </div>
-                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
-                  <div className="text-xs text-zinc-400 font-semibold">DISK STORAGE</div>
-                  <div className="text-2xl font-bold text-white font-mono mt-1">24.2 / 160 GB</div>
-                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ NVMe healthy · 135GB free</div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-
-      {/* ============================================================== */}
-      {/* 6. Core Platform Features Grid */}
+      {/* 5. Core Platform Features Grid */}
       {/* ============================================================== */}
       <section id="features" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
         <div className="text-center mb-12">
@@ -792,8 +570,376 @@ export function LandingPage() {
             )
           })}
         </div>
+
+        <div className="mt-10 text-center">
+          <Link
+            to="/features"
+            className="inline-flex items-center gap-2 text-xs font-semibold text-teal-300 hover:text-white transition-colors"
+          >
+            <span>Explore all architectural specifications</span>
+            <ArrowRight className="w-4 h-4 text-[#00DF8F]" />
+          </Link>
+        </div>
       </section>
 
+      {/* ============================================================== */}
+      {/* 6. Interactive Live Fleet & Deployment Simulator */}
+      {/* ============================================================== */}
+      <section id="simulator" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
+        <div className="text-center mb-10">
+          <span className="text-[11px] font-mono font-semibold uppercase tracking-widest text-[#00DF8F]">
+            [ INTERACTIVE PLATFORM SIMULATOR ]
+          </span>
+          <h2 className="text-[30px] sm:text-[38px] font-extrabold tracking-tight text-white mt-1.5">
+            Experience atomic zero-downtime releases live.
+          </h2>
+          <p className="mt-2 text-[14.5px] max-w-xl mx-auto text-zinc-400">
+            Click simulate below to test preflight checks, isolated builds, atomic symlink pointer swaps, and automated rollback guards in real time.
+          </p>
+        </div>
+
+        {/* Tab Controls Bar */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setActiveSimTab('pipeline')}
+            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${
+              activeSimTab === 'pipeline'
+                ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
+                : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Terminal className="w-3.5 h-3.5" />
+            <span>1. Live Pipeline &amp; Logs</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSimTab('symlink')}
+            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${
+              activeSimTab === 'symlink'
+                ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
+                : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
+            }`}
+          >
+            <ArrowRightLeft className="w-3.5 h-3.5" />
+            <span>2. Atomic Symlink Architecture</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveSimTab('telemetry')}
+            className={`px-4 py-2 rounded-lg text-[12.5px] font-semibold transition-colors cursor-pointer border flex items-center gap-2 ${
+              activeSimTab === 'telemetry'
+                ? 'bg-[#005459]/40 border-teal-500/50 text-[#00DF8F]'
+                : 'bg-[#081419] border-white/10 text-zinc-400 hover:text-white'
+            }`}
+          >
+            <Activity className="w-3.5 h-3.5" />
+            <span>3. Host Telemetry &amp; Vitals</span>
+          </button>
+        </div>
+
+        {/* Main Terminal Window */}
+        <div className="w-full max-w-[1020px] mx-auto bg-[#050D11] border border-white/10 rounded-xl overflow-hidden shadow-2xl text-left font-mono text-[12px] text-zinc-300">
+          <div className="h-[42px] px-4 bg-[#081419] border-b border-white/10 flex items-center justify-between text-zinc-400">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[#FF5F56]" />
+              <span className="w-3 h-3 rounded-full bg-[#FFBD2E]" />
+              <span className="w-3 h-3 rounded-full bg-[#27C93F]" />
+              <span className="ml-2 text-[11.5px] text-zinc-400 font-medium">portalops-runner@hetzner-fsn1-01</span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span className="text-[11px] text-zinc-400">STATUS: READY</span>
+              <button
+                type="button"
+                onClick={runSimulatedDeploy}
+                disabled={isDeployingSim}
+                className="h-7 px-3 rounded bg-[#005459] hover:bg-[#004246] text-white text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 border border-teal-500/30"
+              >
+                <Play className="w-3 h-3 fill-current text-[#00DF8F]" />
+                <span>{isDeployingSim ? 'Deploying...' : 'Simulate Trigger'}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 min-h-[280px]">
+            {activeSimTab === 'pipeline' && (
+              <div className="space-y-2">
+                {simLogs.map((log, idx) => (
+                  <div key={idx} className="flex items-start gap-3">
+                    <span className="text-zinc-600 select-none">{log.time}</span>
+                    <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold border border-current/20 ${log.color}`}>
+                      {log.tag}
+                    </span>
+                    <span className="text-zinc-300">{log.text}</span>
+                  </div>
+                ))}
+                {isDeployingSim && (
+                  <div className="flex items-center gap-2 text-[#00DF8F] pt-2">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Executing deployment pipeline hooks...</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {activeSimTab === 'symlink' && (
+              <div className="space-y-4">
+                <div className="p-4 rounded-lg bg-[#081419] border border-white/10 space-y-2">
+                  <div className="text-xs font-bold text-white flex items-center gap-2">
+                    <ArrowRightLeft className="w-4 h-4 text-[#00DF8F]" />
+                    <span>Atomic Symlink Swap Pattern</span>
+                  </div>
+                  <p className="text-zinc-400 text-[11.5px] leading-relaxed">
+                    Zero-downtime deploys work by assembling builds inside timestamped release folders. Only when all tests pass is the symlink swapped atomically in under 1 millisecond.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
+                    <div className="text-zinc-500 font-mono text-[10px]">STEP 1: ISOLATED BUILD</div>
+                    <div className="font-bold text-white mt-1">Build Release</div>
+                    <div className="text-zinc-400 text-[11px] mt-1">/releases/20261112-143</div>
+                  </div>
+                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
+                    <div className="text-zinc-500 font-mono text-[10px]">STEP 2: ATOMIC SWAP</div>
+                    <div className="font-bold text-[#00DF8F] mt-1">ln -sfn Pointer</div>
+                    <div className="text-zinc-400 text-[11px] mt-1">Swaps to /current (&lt;1ms)</div>
+                  </div>
+                  <div className="p-3 rounded-lg border border-white/10 bg-[#050D11]">
+                    <div className="text-zinc-500 font-mono text-[10px]">STEP 3: ROLLBACK GUARD</div>
+                    <div className="font-bold text-teal-400 mt-1">Instant Revert</div>
+                    <div className="text-zinc-400 text-[11px] mt-1">Points back on 5xx error</div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeSimTab === 'telemetry' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
+                  <div className="text-xs text-zinc-400 font-semibold">CPU LOAD</div>
+                  <div className="text-2xl font-bold text-white font-mono mt-1">18.4%</div>
+                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ Nominal across 4 cores</div>
+                </div>
+                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
+                  <div className="text-xs text-zinc-400 font-semibold">MEMORY USAGE</div>
+                  <div className="text-2xl font-bold text-white font-mono mt-1">2.1 / 8.0 GB</div>
+                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ 73% free RAM buffer</div>
+                </div>
+                <div className="p-4 rounded-lg bg-[#081419] border border-white/10">
+                  <div className="text-xs text-zinc-400 font-semibold">DISK STORAGE</div>
+                  <div className="text-2xl font-bold text-white font-mono mt-1">24.2 / 160 GB</div>
+                  <div className="text-[11px] text-[#00DF8F] mt-1">✓ NVMe healthy · 135GB free</div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ============================================================== */}
+      {/* 7. Partners & Collaboration Section */}
+      {/* ============================================================== */}
+      <section id="partners" className="py-20 px-6 max-w-[1240px] mx-auto w-full">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-teal-300 font-mono mb-3">
+            <Handshake className="w-3.5 h-3.5 text-[#00DF8F]" />
+            <span>PARTNERSHIPS, HOSTING &amp; INTERNAL TOOLING</span>
+          </div>
+          <h2 className="text-[30px] sm:text-[40px] font-extrabold tracking-tight text-white mt-1.5">
+            Partner with PortalOps. Scale without limits.
+          </h2>
+          <p className="mt-2 text-[14.5px] max-w-2xl mx-auto text-zinc-400">
+            Whether you are a hosting company wanting to offer a turnkey push-to-deploy PaaS to your customers, or an engineering team looking for a sovereign Internal Developer Platform for company tools — collaborate with PortalOps.
+          </p>
+        </div>
+
+        {/* 3 Specialized Tracks Grid (3 columns) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Track 1: Hosting & Cloud Infrastructure Companies */}
+          <div className="p-7 sm:p-8 rounded-3xl border border-teal-500/30 bg-[#081419] hover:border-teal-400/60 transition-all text-left flex flex-col justify-between group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-[#005459]/40 border border-[#005459]/80 flex items-center justify-center text-[#00DF8F]">
+                  <Server className="w-6 h-6" />
+                </div>
+                <span className="font-mono text-[10.5px] px-3 py-1 rounded-full bg-teal-500/15 border border-teal-500/30 text-teal-300 font-bold uppercase tracking-wider">
+                  Hosting &amp; Cloud Partners
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-white group-hover:text-teal-300 transition-colors">
+                  Turnkey PaaS Layer for Hosting Providers
+                </h3>
+                <p className="text-xs sm:text-[13.5px] text-zinc-300 leading-relaxed">
+                  Transform raw Ubuntu &amp; Debian VPS or Bare Metal instances into a modern Vercel-like push-to-deploy cloud. Eliminate customer churn to expensive PaaS vendors and increase server retention.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 pt-3 border-t border-white/10 text-xs text-zinc-300">
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>1-Click Marketplace Packaging:</strong> Distribute PortalOps as an official 1-click cloud image or automated cloud-init template for your VPS fleet.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Higher Customer Retention:</strong> Customers keep their servers active when automated SSL, Nginx, and zero-downtime releases work out of the box.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-6">
+              <Link
+                to="/contact?category=hosting-provider&subject=Hosting%20Company%20Partnership"
+                className="w-full h-11 rounded-xl bg-[#005459] hover:bg-[#004246] border border-teal-500/30 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md"
+              >
+                <span>Partner as Hosting Provider</span>
+                <ArrowRight className="w-4 h-4 text-[#00DF8F]" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Track 2: Companies & Teams (Internal Developer Platform - IDP) */}
+          <div className="p-7 sm:p-8 rounded-3xl border border-[#00DF8F]/30 bg-gradient-to-b from-[#08171E] to-[#081419] shadow-xl text-left flex flex-col justify-between group relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-[#00DF8F]/15 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-[#00DF8F]/20 border border-[#00DF8F]/40 flex items-center justify-center text-[#00DF8F]">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <span className="font-mono text-[10.5px] px-3 py-1 rounded-full bg-[#00DF8F]/15 border border-[#00DF8F]/30 text-[#00DF8F] font-bold uppercase tracking-wider">
+                  Enterprise &amp; Teams
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-white group-hover:text-[#00DF8F] transition-colors">
+                  Internal Developer Platform (IDP for Companies)
+                </h3>
+                <p className="text-xs sm:text-[13.5px] text-zinc-200 leading-relaxed">
+                  Adopt PortalOps as an internal deployment console for your company's internal tools, microservices, admin dashboards, and staging fleets on your own private cloud or on-prem servers.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 pt-3 border-t border-white/10 text-xs text-zinc-200">
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>100% Data Sovereignty:</strong> Run internal services inside private corporate VPCs or air-gapped subnets without public cloud exposure.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Zero Developer Root Keys:</strong> Engineering teams deploy safely via webhooks without ever needing SSH root credentials to internal hosts.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Eliminate Per-User Seat Taxes:</strong> Ditch $50+/seat/month public PaaS tiers. Deploy unlimited internal tools with zero compute markups.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-6">
+              <Link
+                to="/contact?category=internal-tools&subject=Internal%20Developer%20Platform%20Inquiry"
+                className="w-full h-11 rounded-xl bg-[#00DF8F] hover:bg-[#00c57d] text-zinc-950 font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-lg shadow-emerald-950/40"
+              >
+                <span>Adopt as Internal Tool (IDP)</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+
+          {/* Track 3: Developer Tools & Ecosystem Integrations */}
+          <div className="p-7 sm:p-8 rounded-3xl border border-white/10 bg-[#081419] hover:border-sky-500/40 transition-all text-left flex flex-col justify-between group">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="w-12 h-12 rounded-2xl bg-sky-500/20 border border-sky-500/40 flex items-center justify-center text-sky-400">
+                  <Layers className="w-6 h-6" />
+                </div>
+                <span className="font-mono text-[10.5px] px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/25 text-sky-300 font-semibold uppercase tracking-wider">
+                  DevTools &amp; Open Source
+                </span>
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-bold text-white group-hover:text-sky-300 transition-colors">
+                  Developer Tooling &amp; Integrations
+                </h3>
+                <p className="text-xs sm:text-[13.5px] text-zinc-400 leading-relaxed">
+                  Integrate your CI/CD runners, database engines, monitoring tools, or backup solutions natively into the PortalOps deployment hooks lifecycle.
+                </p>
+              </div>
+
+              <ul className="space-y-2.5 pt-3 border-t border-white/5 text-xs text-zinc-300">
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Deployment Lifecycle Webhooks:</strong> Trigger post-deploy health probes, Slack/Discord notifications, or cache flushes.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Preflight Hooks &amp; Smoke Tests:</strong> Automated test suites executed before the atomic symlink is swapped.</span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 className="w-4 h-4 text-[#00DF8F] shrink-0 mt-0.5" />
+                  <span><strong>Integrations Hub Placement:</strong> Featured listing in the official PortalOps developer integrations registry.</span>
+                </li>
+              </ul>
+            </div>
+
+            <div className="pt-6">
+              <Link
+                to="/contact?category=partnership&subject=Ecosystem%20Integration%20Proposal"
+                className="w-full h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all group-hover:border-sky-400/40"
+              >
+                <span>Propose an Integration</span>
+                <ArrowRight className="w-3.5 h-3.5 text-sky-400" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Direct Collaboration Box */}
+        <div className="p-7 sm:p-9 rounded-3xl bg-[#040B0E] border border-white/15 flex flex-col md:flex-row items-center justify-between gap-6 text-left shadow-2xl">
+          <div className="space-y-2 max-w-xl">
+            <div className="flex items-center gap-2 text-xs font-mono text-[#00DF8F]">
+              <span className="w-2 h-2 rounded-full bg-[#00DF8F] animate-pulse" />
+              <span>DIRECT EXECUTIVE &amp; PARTNERSHIP CHANNEL</span>
+            </div>
+            <h4 className="text-lg sm:text-xl font-bold text-white">
+              Ready to partner or deploy PortalOps internally?
+            </h4>
+            <p className="text-xs sm:text-[13px] text-zinc-400 leading-relaxed">
+              Whether you manage a global hosting infrastructure fleet or need a secure internal deployment platform for company microservices, our partnership desk is ready to collaborate. Inquiries route directly to{' '}
+              <a href="mailto:info@portalops.online" className="text-teal-300 font-mono underline hover:text-white">
+                info@portalops.online
+              </a>{' '}
+              with a guaranteed reply within 24 business hours.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 shrink-0">
+            <Link
+              to="/contact?category=hosting-provider&subject=Hosting%20and%20Internal%20Tools%20Partnership"
+              className="h-11 px-6 rounded-xl bg-[#00DF8F] hover:bg-[#00c57d] text-zinc-950 font-bold text-xs inline-flex items-center gap-2 transition-all shadow-md shadow-emerald-950/40"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Contact Partnerships Desk</span>
+            </Link>
+
+            <a
+              href="mailto:info@portalops.online?subject=Partnership%20Inquiry%20-%20PortalOps"
+              className="h-11 px-4 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-zinc-300 hover:text-white font-mono text-xs inline-flex items-center gap-1.5 transition-colors"
+            >
+              <span>info@portalops.online</span>
+            </a>
+          </div>
+        </div>
+      </section>
 
       {/* ============================================================== */}
       {/* 8. Developer FAQ Accordion */}
@@ -840,9 +986,45 @@ export function LandingPage() {
         </div>
       </section>
 
+      {/* ============================================================== */}
+      {/* 9. Bottom High-Impact Conversion Banner */}
+      {/* ============================================================== */}
+      <section className="py-20 px-6 max-w-[1240px] mx-auto w-full text-center">
+        <div className="p-10 sm:p-16 rounded-3xl bg-gradient-to-b from-[#08171E] to-[#040A0D] border border-[#005459]/50 shadow-2xl relative overflow-hidden space-y-6">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs bg-white/5 border border-white/10 text-[#00DF8F] font-mono">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Own Your Infrastructure</span>
+          </div>
 
+          <h2 className="text-3xl sm:text-5xl font-black text-white max-w-2xl mx-auto tracking-tight">
+            Ready to take back control of your servers?
+          </h2>
 
-      {/* 10. Comprehensive Developer Footer */}
+          <p className="text-zinc-400 text-sm sm:text-base max-w-xl mx-auto leading-relaxed">
+            Connect your first Hetzner, DigitalOcean, or AWS VPS and ship your production app with zero downtime in under 2 minutes.
+          </p>
+
+          <div className="flex flex-wrap items-center justify-center gap-4 pt-3">
+            <Link
+              to={isAuthenticated ? '/dashboard' : '/register'}
+              className="h-12 px-8 rounded-xl bg-[#00DF8F] hover:bg-[#00c57d] text-zinc-950 font-bold text-xs inline-flex items-center gap-2 transition-all shadow-xl shadow-emerald-950/40 cursor-pointer"
+            >
+              <span>{isAuthenticated ? 'Go to Console' : 'Start Deploying Free'}</span>
+              <ArrowRight className="w-4 h-4" />
+            </Link>
+
+            <Link
+              to="/docs"
+              className="h-12 px-6 rounded-xl bg-white/5 hover:bg-white/10 border border-white/15 text-white text-xs font-semibold inline-flex items-center gap-2 transition-all"
+            >
+              <BookOpen className="w-4 h-4 text-teal-300" />
+              <span>Read Quickstart Guide</span>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
       <PublicFooter />
     </div>
   )

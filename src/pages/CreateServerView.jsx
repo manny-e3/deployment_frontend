@@ -18,6 +18,7 @@ import {
   Database,
   Shuffle,
   Info,
+  Zap,
 } from 'lucide-react'
 import {
   DigitalOceanLogo,
@@ -637,7 +638,7 @@ export function CreateServerView() {
                 <div className="px-3.5 py-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-900/30 text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
                   <Shield className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   <span>
-                    <strong>Bring Your Own Server:</strong> No cloud provider API required. Connect via 1-line script or direct SSH.
+                    <strong>Bring Your Own Server:</strong> No cloud provider API required. Connect via keyless 1-line script (recommended) or direct encrypted SSH.
                   </span>
                 </div>
               </div>
@@ -721,7 +722,7 @@ export function CreateServerView() {
                           : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
                         }`}
                     >
-                      1-Line Setup Script (Zero Root Password)
+                      1-Line Setup Script (Keyless · Recommended)
                     </button>
                     <button
                       type="button"
@@ -731,7 +732,7 @@ export function CreateServerView() {
                           : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900'
                         }`}
                     >
-                      Direct SSH Credentials
+                      Direct SSH Credentials (AES-256 Encrypted)
                     </button>
                   </div>
 
@@ -761,7 +762,7 @@ export function CreateServerView() {
                       </pre>
 
                       <p className="text-[11px] text-zinc-400 leading-relaxed">
-                        The script automatically creates an isolated <code className="text-[#00DF8F]">portalops</code> user, configures SSH keys, scopes sudo permissions, and confirms connection back to PortalOps. <strong>You never share root passwords or private keys.</strong>
+                        The script automatically creates an isolated <code className="text-[#00DF8F]">portalops</code> user, configures SSH keys, scopes sudo permissions, and confirms connection back to PortalOps. <strong>Under this method, you never share root passwords or private keys.</strong>
                       </p>
                     </div>
                   )}
@@ -834,9 +835,12 @@ export function CreateServerView() {
                             type="password"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Enter user or root password"
+                            placeholder="Enter deploy user password (or root)"
                             className="w-full px-3 py-2 text-sm rounded-lg bg-zinc-50 dark:bg-[#060D10] border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-[#005459]"
                           />
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                            🔒 Encrypted at rest using AES-256-GCM envelope encryption.
+                          </p>
                         </div>
                       ) : (
                         <div>
@@ -850,6 +854,9 @@ export function CreateServerView() {
                             placeholder="-----BEGIN OPENSSH PRIVATE KEY-----..."
                             className="w-full px-3 py-2 text-xs rounded-lg bg-zinc-50 dark:bg-[#060D10] border border-zinc-200 dark:border-zinc-700 text-zinc-900 dark:text-white font-mono focus:outline-none focus:border-[#005459]"
                           />
+                          <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
+                            🔒 Encrypted at rest using AES-256-GCM envelope encryption.
+                          </p>
                         </div>
                       )}
                     </div>

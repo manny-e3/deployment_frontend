@@ -51,7 +51,7 @@ export function SecurityArchitecture() {
   }
 
   return (
-    <div className="min-h-screen font-sans flex flex-col relative overflow-hidden bg-[#061014] text-white selection:bg-[#00DF8F] selection:text-zinc-950">
+    <div className="min-h-screen font-sans flex flex-col relative overflow-x-clip bg-[#061014] text-white selection:bg-[#00DF8F] selection:text-zinc-950">
       {/* Deep PortalOps Ambient Spotlights */}
       <div
         className="absolute top-0 left-0 w-[800px] h-[700px] pointer-events-none blur-[140px] -z-10 opacity-70"
@@ -89,7 +89,7 @@ export function SecurityArchitecture() {
 
           <div className="mt-6 flex flex-wrap items-center gap-4 text-xs font-mono text-zinc-400">
             <span className="px-2.5 py-1 rounded-md bg-[#081419] border border-white/10 text-[#00DF8F]">
-              Control Plane: v2.4
+              Control Plane
             </span>
             <span className="px-2.5 py-1 rounded-md bg-[#081419] border border-white/10 text-teal-300">
               Cipher: AES-256-GCM + Argon2id
@@ -120,11 +120,10 @@ export function SecurityArchitecture() {
                   <button
                     key={s.id}
                     onClick={() => scrollTo(s.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer truncate ${
-                      activeSection === s.id
+                    className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer truncate ${activeSection === s.id
                         ? 'bg-[#005459]/50 text-[#00DF8F] border border-teal-500/40 font-semibold shadow-xs'
                         : 'text-zinc-400 hover:text-white hover:bg-white/5'
-                    }`}
+                      }`}
                   >
                     {s.title}
                   </button>
@@ -174,10 +173,10 @@ export function SecurityArchitecture() {
                 <div className="p-4 rounded-xl border border-white/10 bg-[#050D11] space-y-1.5">
                   <div className="font-bold text-xs text-white flex items-center gap-2">
                     <EyeOff className="w-4 h-4 text-sky-400" />
-                    <span>Zero Root Password Ingestion</span>
+                    <span>Keyless Mode &amp; Zero-Root Isolation</span>
                   </div>
                   <p className="text-xs text-zinc-400">
-                    We never record, store, or transmit your root SSH passwords. Automated provisioning provisions a dedicated unprivileged deployer user.
+                    Under automated 1-line script provisioning, your root password is never transmitted. For direct SSH mode, credentials are encrypted with AES-256-GCM.
                   </p>
                 </div>
 
