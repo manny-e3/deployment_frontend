@@ -16,6 +16,7 @@ import {
   Info,
 } from 'lucide-react'
 import { api } from '../services/api'
+import { encodeScript } from '../utils/scriptEncoding'
 
 export const FRAMEWORK_LABELS = {
   node: 'Node.js / PM2',
@@ -915,8 +916,8 @@ export function AddTargetModal({
         serverId,
         path: trimmedPath,
         branch: branch.trim() || null,
-        preDeploy: preDeploy.trim(),
-        postDeploy: postDeploy.trim(),
+        preDeploy: encodeScript(preDeploy),
+        postDeploy: encodeScript(postDeploy),
       }
       if (healthCheckUrl.trim()) {
         payload.healthCheckUrl = healthCheckUrl.trim()

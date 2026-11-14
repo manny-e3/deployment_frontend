@@ -138,9 +138,20 @@ export function watchDeploy(id, { onLines, onFinished }) {
   socket.on('deployment:status', onStatus);
   socket.on('connect', onReconnect);
 
-  join();
-  fetchAfter().then(async (finished) => {
-    if (finished && onFinished && !isCleanedUp) {
+  if (!socket.connected) {
+    connectSocket();
+  } else {
+    join();
+  }
+
+  let pollInterval = null;
+
+  const checkDeploymentCompletion = async (isFinished) => {
+    if (isFinished && onFinished && !isCleanedUp) {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+      }
       try {
         const fullDeploy = await api(`/deployments/${id}`);
         onFinished(fullDeploy);
@@ -148,10 +159,30 @@ export function watchDeploy(id, { onLines, onFinished }) {
         // Log finished or endpoint offline
       }
     }
-  });
+  };
+
+  fetchAfter().then(checkDeploymentCompletion);
+
+  // Resilient fallback polling: guarantees updates even across proxies, VPNs, or socket reconnections
+  pollInterval = setInterval(async () => {
+    if (isCleanedUp) {
+      if (pollInterval) clearInterval(pollInterval);
+      return;
+    }
+    try {
+      const finished = await fetchAfter();
+      if (finished) {
+        await checkDeploymentCompletion(true);
+      }
+    } catch (_) {}
+  }, 1500);
 
   return () => {
     isCleanedUp = true;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
     if (socket.connected) {
       socket.emit('deployment:leave', { id });
     }

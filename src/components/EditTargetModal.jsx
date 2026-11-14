@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { api } from '../services/api'
 import { TARGET_PRESETS, isWindowsServer, FRAMEWORK_LABELS } from './AddTargetModal'
+import { encodeScript, decodeScript } from '../utils/scriptEncoding'
 
 export function EditTargetModal({ isOpen, onClose, projectId, target, projectFramework = 'react', onTargetUpdated }) {
   const [name, setName] = useState('')
@@ -65,8 +66,8 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, projectFra
       setName(target.name || '')
       setPath(target.path || target.targetDir || '')
       setBranch(target.branch || 'main')
-      setPreDeploy(target.preDeploy || '')
-      const currentScript = target.postDeploy || ''
+      setPreDeploy(decodeScript(target.preDeploy || ''))
+      const currentScript = decodeScript(target.postDeploy || '')
       setPostDeploy(currentScript)
       let savedMeta = {}
       try {
@@ -144,8 +145,8 @@ export function EditTargetModal({ isOpen, onClose, projectId, target, projectFra
         name: name.trim(),
         path: trimmedPath,
         branch: branch.trim() || null,
-        preDeploy: preDeploy.trim(),
-        postDeploy: postDeploy.trim(),
+        preDeploy: encodeScript(preDeploy),
+        postDeploy: encodeScript(postDeploy),
       }
       if (healthCheckUrl.trim()) {
         payload.healthCheckUrl = healthCheckUrl.trim()
