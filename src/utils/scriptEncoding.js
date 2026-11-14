@@ -40,3 +40,4 @@ export function decodeScript(val) {
   }
   return val || ''
 }
+
